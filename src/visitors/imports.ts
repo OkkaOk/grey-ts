@@ -3,7 +3,7 @@ import { transpile } from "../transpiler";
 
 function handleImportDeclaration(node: ts.ImportDeclaration): string {
 	const moduleSpecifier = (node.moduleSpecifier as ts.StringLiteral).text;
-	return transpile(moduleSpecifier)
+	return transpile(moduleSpecifier);
 }
 
 export function createImportHandlers() {

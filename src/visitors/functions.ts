@@ -1,11 +1,15 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler";
+import { createAnonFunction, handleNode } from "../transpiler";
 
 function transpileFunctionBody(node: Pick<ts.FunctionDeclaration, "parameters" | "body">) {
 	const params = node.parameters.map(param => handleNode(param.name)).join(", ");
-	const body = node.body ? node.body.statements.map(val => handleNode(val)).join("\n\t") : "";
+	const body = node.body ? handleBlock(node.body) : "";
 
 	return `function(${params})\n\t${body}\nend function`;
+}
+
+function handleBlock(node: ts.Block): string {
+	return node.statements.map(val => handleNode(val)).join("\n\t");
 }
 
 function handleConstructor(node: ts.ConstructorDeclaration): string {
@@ -21,11 +25,26 @@ function handleFunctionDeclaration(node: ts.FunctionDeclaration): string {
 	return `${name} = ${transpileFunctionBody(node)}`;
 }
 
+function handleArrowFunction(node: ts.ArrowFunction): string {
+	// TODO: implement
+	console.log(node);
+	console.log(node.getText());
+	const body = handleNode(node.body);
+
+	const { name, str } = createAnonFunction(body, "");
+
+	const result = `${name}()`;
+	console.log(result);
+	return result;
+}
+
 export function createFunctionHandlers() {
 	return {
+		[ts.SyntaxKind.Block]: handleBlock,
 		[ts.SyntaxKind.Constructor]: handleConstructor,
 		[ts.SyntaxKind.MethodDeclaration]: handleMethodDeclaration,
 		[ts.SyntaxKind.FunctionDeclaration]: handleFunctionDeclaration,
+		// [ts.SyntaxKind.ArrowFunction]: handleArrowFunction
 	};
 }
 

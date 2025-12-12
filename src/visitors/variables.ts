@@ -1,14 +1,18 @@
 import ts from "typescript";
 import { handleNode } from "../transpiler";
 
-function transpileVariableDeclaration(node: ts.VariableDeclaration): string {
+function handleVariableDeclaration(node: ts.VariableDeclaration): string {
 	const name = handleNode(node.name);
 	const init = node.initializer ? handleNode(node.initializer) : "null";
 	return `${name} = ${init}`;
 }
 
+function handleVariableDeclarationList(node: ts.VariableDeclarationList): string {
+	return node.declarations.map(decl => handleVariableDeclaration(decl)).join("\n");
+}
+
 function handleVariableStatement(node: ts.VariableStatement): string {
-	return node.declarationList.declarations.map(decl => transpileVariableDeclaration(decl)).join("\n");
+	return handleVariableDeclarationList(node.declarationList);
 }
 
 function handlePropertyDeclaration(node: ts.PropertyDeclaration): string {
@@ -19,6 +23,8 @@ function handlePropertyDeclaration(node: ts.PropertyDeclaration): string {
 
 export function createVariableHandlers() {
 	return {
+		[ts.SyntaxKind.VariableDeclaration]: handleVariableDeclaration,
+		[ts.SyntaxKind.VariableDeclarationList]: handleVariableDeclarationList,
 		[ts.SyntaxKind.VariableStatement]: handleVariableStatement,
 		[ts.SyntaxKind.PropertyDeclaration]: handlePropertyDeclaration,
 	};
