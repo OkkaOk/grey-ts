@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler";
+import { handleNode } from "../transpiler.ts";
 
 function handleVariableDeclaration(node: ts.VariableDeclaration): string {
 	const name = handleNode(node.name);

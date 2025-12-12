@@ -1,17 +1,18 @@
-import * as fs from "fs";
-import * as path from "path";
+import { hash } from "node:crypto";
+import * as path from "node:path";
 import ts from "typescript";
-import parseCode from "./parser";
+import parseCode from "./parser.ts";
 
-import { hash } from "crypto";
-import createAssignmentHandlers from "./visitors/assignments";
-import createClassHandlers from "./visitors/classes";
-import createExpressionHandlers from "./visitors/expressions";
-import createFunctionHandlers from "./visitors/functions";
-import createIdentifierHandlers from "./visitors/identifiers";
-import createImportHandlers from "./visitors/imports";
-import createStatementHandlers from "./visitors/statements";
-import createVariableHandlers from "./visitors/variables";
+import createAssignmentHandlers from "./visitors/assignments.ts";
+import createClassHandlers from "./visitors/classes.ts";
+import createExpressionHandlers from "./visitors/expressions.ts";
+import createFunctionHandlers from "./visitors/functions.ts";
+import createIdentifierHandlers from "./visitors/identifiers.ts";
+import createImportHandlers from "./visitors/imports.ts";
+import createStatementHandlers from "./visitors/statements.ts";
+import createVariableHandlers from "./visitors/variables.ts";
+
+const decoder = new TextDecoder();
 
 type Mode = "ts" | "js";
 
@@ -44,10 +45,10 @@ function createHandlers() {
 	return handlers;
 }
 
-function createConditionalFunction() {
+export function createConditionalFunction() {
 	const name = "conditional_func";
 
-	const result = `\n
+	const result = `\
 ${name} = function(condition,true_val,false_val)
 if condition then
 	return true_val
@@ -56,6 +57,7 @@ else
 end if
 end function`;
 
+	anonFunctions.set(name, result)
 	return result;
 }
 
@@ -76,18 +78,21 @@ export function handleNode(node: ts.Node) {
 	return "";
 }
 
-export function transpile(relativePath: string, basePath = __dirname): string {
+export function transpileModule(relativePath: string, basePath = import.meta.dirname!) {
 	let filePath = path.resolve(basePath, relativePath);
 	const extname = path.extname(filePath);
 	if (!extname) filePath = filePath + ".ts";
 
-	const code = fs.readFileSync(filePath, { encoding: "utf-8" });
+	const fileName = path.basename(filePath);
+	const code = decoder.decode(Deno.readFileSync(filePath));
 
 	if (cache.has(filePath)) return cache.get(filePath)!;
 
-	const fileName = path.basename(filePath);
 	const sourceFile = parseCode(fileName, code);
+	return transpile(sourceFile);
+}
 
+export function transpile(sourceFile: ts.SourceFile): string {
 	if (!Object.keys(handlers).length) {
 		handlers = createHandlers();
 	}
@@ -98,10 +103,7 @@ export function transpile(relativePath: string, basePath = __dirname): string {
 		anonFunctions.clear();
 	}
 
-	if (cache.size === 0)
-		result = "\n" + createConditionalFunction() + "\n" + result;
-
-	cache.set(filePath, result);
+	cache.set(sourceFile.fileName, result);
 	return result;
 }
 

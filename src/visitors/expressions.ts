@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler";
+import { createConditionalFunction, handleNode } from "../transpiler.ts";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression): string {
 	return `${handleNode(node.expression)}.${handleNode(node.name)}`;
@@ -93,6 +93,7 @@ function handleConditionalExpression(node: ts.ConditionalExpression): string {
 	// Call the anonymous function to get the value
 	// return `${name}(${handleNode(node.condition)})`;
 
+	createConditionalFunction();
 	return `conditional_func(${handleNode(node.condition)}, ${handleNode(node.whenTrue)}, ${handleNode(node.whenFalse)})`;
 }
 

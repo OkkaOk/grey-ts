@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { createAnonFunction, handleNode } from "../transpiler";
+import { createAnonFunction, handleNode } from "../transpiler.ts";
 
 function transpileFunctionBody(node: Pick<ts.FunctionDeclaration, "parameters" | "body">) {
 	const params = node.parameters.map(param => handleNode(param.name)).join(", ");
@@ -31,7 +31,7 @@ function handleArrowFunction(node: ts.ArrowFunction): string {
 	console.log(node.getText());
 	const body = handleNode(node.body);
 
-	const { name, str } = createAnonFunction(body, "");
+	const name = createAnonFunction(body, "").name;
 
 	const result = `${name}()`;
 	console.log(result);

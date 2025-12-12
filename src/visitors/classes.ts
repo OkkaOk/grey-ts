@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler";
+import { handleNode } from "../transpiler.ts";
 
 function handleClassDeclaration(node: ts.ClassDeclaration): string {
 	const name = node.name ? node.name.text : "anon";

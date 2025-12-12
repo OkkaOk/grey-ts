@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler";
+import { handleNode } from "../transpiler.ts";
 
 function handlePropertyAssignment(node: ts.PropertyAssignment): string {
 	return `\"${handleNode(node.name)}\": ${handleNode(node.initializer)}`;

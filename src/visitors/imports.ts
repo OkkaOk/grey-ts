@@ -1,9 +1,9 @@
 import ts from "typescript";
-import { transpile } from "../transpiler";
+import { transpileModule } from "../transpiler.ts";
 
 function handleImportDeclaration(node: ts.ImportDeclaration): string {
 	const moduleSpecifier = (node.moduleSpecifier as ts.StringLiteral).text;
-	return transpile(moduleSpecifier);
+	return transpileModule(moduleSpecifier);
 }
 
 export function createImportHandlers() {
