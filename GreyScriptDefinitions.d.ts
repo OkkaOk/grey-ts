@@ -84,7 +84,7 @@ interface FtpShell {
 	scp: Shell["scp"];
 }
 
-interface Shell {
+export interface Shell {
 	classID: "shell";
 	host_computer: Computer;
 	build: (sourcePath: string, binaryPath: string, allowImport?: boolean) => string;
@@ -98,9 +98,9 @@ interface Shell {
 type netDevice = "wlan0" | "eth0";
 
 declare global {
+	function get_shell(user?: string, pass?: string): Shell | null;
 	/** Print a message to the terminal. */
 	function print(value: any, replaceText?: boolean): null;
-	function get_shell(user?: string, pass?: string): Shell | null;
 }
 
 export { };

@@ -2,10 +2,21 @@
 	"compilerOptions": {
 		"baseUrl": "./",
 		"target": "ESNext",
-		"module": "CommonJS",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
 		"strict": true,
 		"outDir": "dist",
 		"forceConsistentCasingInFileNames": true,
+		"esModuleInterop": true,
+		"allowJs": true,
+		"paths": {
+			"@/*": [
+				"./*"
+			],
+			"GreyScriptDefinitions": [
+				"GreyScriptDefinitions.d.ts"
+			]
+		},
 	},
-	"include": ["src"]
+	"include": ["src", "GreyScriptDefinitions.d.ts"]
 }
