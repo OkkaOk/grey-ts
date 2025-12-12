@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"baseUrl": "./",
+		"target": "ESNext",
+		"module": "CommonJS",
+		"strict": true,
+		"outDir": "dist",
+		"forceConsistentCasingInFileNames": true,
+	},
+	"include": ["src"]
+}
