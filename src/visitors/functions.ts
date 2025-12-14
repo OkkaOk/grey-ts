@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { createAnonFunction, handleNode } from "../transpiler.ts";
+import { declaredFunctions, handleNode } from "../transpiler.ts";
 
 function transpileFunctionBody(node: Pick<ts.FunctionDeclaration, "parameters" | "body">) {
 	const params = node.parameters.map(param => handleNode(param.name)).join(", ");
@@ -22,20 +22,26 @@ function handleMethodDeclaration(node: ts.MethodDeclaration): string {
 
 function handleFunctionDeclaration(node: ts.FunctionDeclaration): string {
 	const name = node.name ? node.name.text : "anon";
+	declaredFunctions[name] = true;
+
 	return `${name} = ${transpileFunctionBody(node)}`;
 }
 
 function handleArrowFunction(node: ts.ArrowFunction): string {
-	// TODO: implement
-	console.log(node);
-	console.log(node.getText());
-	const body = handleNode(node.body);
+	// if (ts.isBinaryExpression(node.parent) && !Object.is(node.parent.right, node)) {
+	// 	throw new Error("Inline arrow functions are not supported.");
+	// }
+	if (ts.isVariableDeclaration(node.parent)) {
+		declaredFunctions[handleNode(node.parent.name)] = true
+	}
+	else if (!ts.isBinaryExpression(node.parent)){
+		throw new Error("Inline arrow functions are not supported.");
+	}
+	
+	const params = node.parameters.map(param => handleNode(param.name)).join(", ");
+	const body = ts.isBlock(node.body) ? handleNode(node.body) : `return ${handleNode(node.body)}`;
 
-	const name = createAnonFunction(body, "").name;
-
-	const result = `${name}()`;
-	console.log(result);
-	return result;
+	return `function(${params})\n\t${body}\nend function`;
 }
 
 export function createFunctionHandlers() {
@@ -44,7 +50,7 @@ export function createFunctionHandlers() {
 		[ts.SyntaxKind.Constructor]: handleConstructor,
 		[ts.SyntaxKind.MethodDeclaration]: handleMethodDeclaration,
 		[ts.SyntaxKind.FunctionDeclaration]: handleFunctionDeclaration,
-		// [ts.SyntaxKind.ArrowFunction]: handleArrowFunction
+		[ts.SyntaxKind.ArrowFunction]: handleArrowFunction
 	};
 }
 

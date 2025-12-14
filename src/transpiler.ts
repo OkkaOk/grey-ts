@@ -12,6 +12,47 @@ import createImportHandlers from "./visitors/imports.ts";
 import createStatementHandlers from "./visitors/statements.ts";
 import createVariableHandlers from "./visitors/variables.ts";
 
+export const apiNameMap: Record<string, string> = {
+	print: "print",
+	getType: "typeof",
+	getShell: "get_shell",
+	hostComputer: "host_computer",
+	localIp: "local_ip",
+	publicIp: "public_ip",
+	connectService: "connect_service",
+	startTerminal: "start_terminal",
+	isBinary: "is_binary",
+	isFolder: "is_folder",
+	isSymlink: "is_symlink",
+	hasPermission: "has_permission",
+	getFiles: "get_files",
+	getFolders: "get_folders",
+	getContent: "get_content",
+	setContent: "set_content",
+	setGroup: "set_group",
+	setOwner: "set_owner",
+	isClosed: "is_closed",
+	getLanIp: "get_lan_ip",
+	getName: "get_name",
+	createFolder: "create_folder",
+	activeNetCard: "active_net_card",
+	changePassword: "change_password",
+	closeProgram: "close_program",
+	connectEthernet: "connect_ethernet",
+	connectWifi: "connect_wifi",
+	createGroup: "create_group",
+	createUser: "create_user",
+	deleteGroup: "delete_group",
+	deleteUser: "delete_user",
+	getPorts: "get_ports",
+	isNetworkActive: "is_network_active",
+	networkDevices: "network_devices",
+	networkGateway: "network_gateway",
+	showProcs: "show_procs",
+	wifiNetworks: "wifi_networks",
+	file: "File",
+} as const;
+
 const decoder = new TextDecoder();
 
 type Mode = "ts" | "js";
@@ -22,9 +63,13 @@ export type TranspileContext = {
 	cache?: Map<string, string>;
 };
 
+const totalStatements: string[] = [];
+
 let handlers: Record<number, (node: ts.Node) => string> = {};
-const cache = new Map<string, string>();
-const anonFunctions = new Map<string, string>();
+const cache = new Map<string, string[]>();
+const utilFunctions = new Map<string, string>();
+
+export const declaredFunctions: Record<string, boolean> = {};
 
 function createHandlers() {
 	const handlers: Record<number, (node: ts.Node) => string> = {};
@@ -45,36 +90,29 @@ function createHandlers() {
 	return handlers;
 }
 
-export function createConditionalFunction() {
-	const name = "conditional_func";
-
-	const result = `\
-${name} = function(condition,true_val,false_val)
-if condition then
-	return true_val
-else
-	return false_val
-end if
-end function`;
-
-	anonFunctions.set(name, result)
-	return result;
-}
-
 export function createAnonFunction(body: string, params: string) {
 	const randomName = "func_" + hash("sha1", `${Date.now()} ${Math.random()}`).slice(0, 10);
 
 	const result = `${randomName} = function(${params})\n${body}\nend function`;
-	anonFunctions.set(randomName, result);
+	utilFunctions.set(randomName, result);
 
 	return { name: randomName, str: result };
 }
 
 export function handleNode(node: ts.Node) {
-	const handler = handlers[node.kind];
-	if (handler) return handler(node);
+	try {
+		const handler = handlers[node.kind];
+		if (handler) return handler(node);
+	} catch (error) {
+		console.error(error instanceof Error ? `Error: ${error.message}` : error);
 
-	console.log(`Found SyntaxKind ${node.kind} that was not transpiled: ${node.getText()}`);
+		const source = node.getSourceFile();
+		const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
+		console.error(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character}`);
+		return "null";
+	}
+
+	console.log(`Unsupported syntax ${ts.SyntaxKind[node.kind]} (kind ${node.kind}) was not transpiled: ${node.getText()}`);
 	return "";
 }
 
@@ -84,26 +122,39 @@ export function transpileModule(relativePath: string, basePath = import.meta.dir
 	if (!extname) filePath = filePath + ".ts";
 
 	const fileName = path.basename(filePath);
+
+	// Everything is bundled so this should already be in the file.
+	// TODO: better system
+	if (cache.has(filePath)) return "";
+
 	const code = decoder.decode(Deno.readFileSync(filePath));
-
-	if (cache.has(filePath)) return cache.get(filePath)!;
-
 	const sourceFile = parseCode(fileName, code);
-	return transpile(sourceFile);
+
+	return transpile(sourceFile, filePath);
 }
 
-export function transpile(sourceFile: ts.SourceFile): string {
+export function transpile(sourceFile: ts.SourceFile, cachePath: string): string {
 	if (!Object.keys(handlers).length) {
 		handlers = createHandlers();
 	}
 
-	let result = sourceFile.statements.map(value => handleNode(value)).join("\n");
-	if (anonFunctions.size) {
-		result = anonFunctions.values().toArray().join("\n") + "\n" + result;
-		anonFunctions.clear();
+	const isEntry = cache.size === 0;
+	cache.set(cachePath, []);
+
+	const statements = sourceFile.statements.map(value => handleNode(value));
+	if (utilFunctions.size) {
+		statements.unshift(...utilFunctions.values().toArray());
+		utilFunctions.clear();
 	}
 
-	cache.set(sourceFile.fileName, result);
-	return result;
+	totalStatements.push(...statements);
+
+	if (isEntry) {
+		const joined = totalStatements.join("\n");
+		return joined;
+	}
+
+	cache.set(cachePath, statements);
+	return "";
 }
 

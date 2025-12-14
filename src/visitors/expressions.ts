@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { createConditionalFunction, handleNode } from "../transpiler.ts";
+import { handleNode } from "../transpiler.ts";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression): string {
 	return `${handleNode(node.expression)}.${handleNode(node.name)}`;
@@ -23,6 +23,9 @@ function handleNewExpression(node: ts.CallExpression): string {
 
 function handleBinaryExpression(node: ts.BinaryExpression): string {
 	let operatorToken = ts.tokenToString(node.operatorToken.kind) || node.operatorToken.getText();
+	if (operatorToken == "+=" || operatorToken == "-=")
+		return `${handleNode(node.left)} = ${handleNode(node.left)} ${operatorToken[0]} ${handleNode(node.right)}`
+
 	if (operatorToken == "**") operatorToken = "^";
 	else if (operatorToken == "||") operatorToken = "or";
 	else if (operatorToken == "&&") operatorToken = "and";
@@ -61,6 +64,7 @@ function handleElementAccessExpression(node: ts.ElementAccessExpression): string
 	return `${handleNode(node.expression)}[${handleNode(node.argumentExpression)}]`;
 }
 
+// e.g. `Hello ${name}`
 function handleTemplateExpression(node: ts.TemplateExpression): string {
 	// console.log(node);
 
@@ -86,15 +90,16 @@ function handleTemplateSpan(node: ts.TemplateSpan): string {
 }
 
 function handleConditionalExpression(node: ts.ConditionalExpression): string {
-	// const param = "cond";
-	// const body = `if ${param} then\nreturn ${handleNode(node.whenTrue)}\nelse\nreturn ${handleNode(node.whenFalse)}\nend if`;
-	// const { name, str } = createAnonFunction(body, param);
+	if (node.parent.kind === ts.SyntaxKind.CallExpression) {
+		throw new Error("Conditional expressions are not supported inside call expressions.")
+	}
 
-	// Call the anonymous function to get the value
-	// return `${name}(${handleNode(node.condition)})`;
-
-	createConditionalFunction();
-	return `conditional_func(${handleNode(node.condition)}, ${handleNode(node.whenTrue)}, ${handleNode(node.whenFalse)})`;
+	return `\
+if (${handleNode(node.condition)}) then
+	${handleNode(node.whenTrue)}
+else
+	${handleNode(node.whenFalse)}
+end if`
 }
 
 export function createExpressionHandlers() {

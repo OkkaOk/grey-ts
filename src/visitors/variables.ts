@@ -4,7 +4,7 @@ import { handleNode } from "../transpiler.ts";
 function handleVariableDeclaration(node: ts.VariableDeclaration): string {
 	const name = handleNode(node.name);
 	const init = node.initializer ? handleNode(node.initializer) : "null";
-	return `${name} = ${init}`;
+	return `${name} = ${init || "null"}`;
 }
 
 function handleVariableDeclarationList(node: ts.VariableDeclarationList): string {
