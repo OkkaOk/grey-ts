@@ -28,7 +28,8 @@
 	},
 	"scripts": {
 		"build": "npx tsc --build --clean && npx tsc",
-		"transpile": "node dist/index.js"
+		"transpile": "node dist/index.js",
+		"prepare": "npm run build"
 	},
 	"files": [
 		"dist"
