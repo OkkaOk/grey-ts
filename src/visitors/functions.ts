@@ -1,7 +1,7 @@
 import ts from "typescript";
 import { declaredFunctions, handleNode } from "../transpiler.js";
 
-function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.FunctionDeclaration["parameters"] }) {
+function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration> }) {
 	const params = node.parameters.map(param => handleNode(param.name)).join(", ");
 	const body = node.body ? handleBlock(node.body) : "";
 
@@ -13,7 +13,10 @@ function handleBlock(node: ts.Block): string {
 }
 
 function handleConstructor(node: ts.ConstructorDeclaration): string {
-	return `constructor = ${transpileFunctionBody(node)}`;
+	const params = node.parameters.map(param => handleNode(param.name)).join(", ");
+	const body = node.body ? handleBlock(node.body) : "";
+
+	return `constructor = function(${params})\n\t${body}\nreturn self\nend function`;
 }
 
 function handleMethodDeclaration(node: ts.MethodDeclaration): string {

@@ -23,13 +23,10 @@ function handleCallExpression(node: ts.CallExpression): string {
 	return `${handleNode(node.expression)}(${args})`;
 }
 
-function handleNewExpression(node: ts.CallExpression): string {
-	const newVariableName = ts.isVariableDeclaration(node.parent) ? handleNode(node.parent.name) : "";
-	let output = `new ${handleNode(node.expression)}`;
-	if (newVariableName) {
-		const params = node.arguments?.map(arg => handleNode(arg)) || [];
-		output += `\n${newVariableName}.constructor(${params.join(",")})`;
-	}
+function handleNewExpression(node: ts.NewExpression): string {
+	const params = node.arguments?.map(arg => handleNode(arg)) || [];
+	const output = `(new ${handleNode(node.expression)}).constructor(${params.join(",")})`;
+
 	return output;
 }
 
@@ -42,6 +39,7 @@ function handleBinaryExpression(node: ts.BinaryExpression): string {
 	else if (operatorToken == "||") operatorToken = "or";
 	else if (operatorToken == "&&") operatorToken = "and";
 	else if (operatorToken == "===") operatorToken = "==";
+	else if (operatorToken == "!==") operatorToken = "!=";
 
 	return `${handleNode(node.left)} ${operatorToken} ${handleNode(node.right)}`;
 }
@@ -54,13 +52,22 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 	const operand = handleNode(node.operand);
 
 	const operator = ts.tokenToString(node.operator);
-	if (operator == "!")
-		return `not ${operand}`;
-
 	if (operator == "++")
 		return `${operand} = ${operand} + 1`;
 
-	return `${operand} = ${operand} - 1`;
+	if (operator == "--")
+		return `${operand} = ${operand} - 1`;
+
+	if (operator == "!")
+		return `not ${operand}`;
+
+	if (operator == "-")
+		return `-${operand}`;
+
+	if (operator == "+")
+		return `${operand}.val()`;
+
+	throw new Error(`Couldn't handle this UnaryExpression: ${node.getText()}`)
 }
 
 function handleArrayLiteralExpression(node: ts.ArrayLiteralExpression): string {
@@ -128,7 +135,14 @@ function createExpressionHandlers() {
 		[ts.SyntaxKind.ExpressionStatement]: (node: ts.ExpressionStatement) => handleNode(node.expression),
 		[ts.SyntaxKind.NonNullExpression]: (node: ts.NonNullExpression) => handleNode(node.expression),
 		[ts.SyntaxKind.ReturnStatement]: (node: ts.ReturnStatement) => {
-			if (!node.expression) return "return";
+			if (!node.expression) {
+				// We're inside a constructor
+				if (ts.findAncestor(node, (n) => ts.isConstructorDeclaration(n)))
+					return "return self";
+				
+				return "return";
+			}
+			
 			return `return ${handleNode(node.expression)}`;
 		},
 		[ts.SyntaxKind.ParenthesizedExpression]: handleParenthesizedExpression,

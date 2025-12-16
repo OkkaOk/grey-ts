@@ -34,11 +34,20 @@ function handleIfStatement(node: ts.IfStatement): string {
 	return output;
 }
 
+function handleWhileStatement(node: ts.WhileStatement): string {
+	const expression = handleNode(node.expression);
+
+	return `while ${expression}\n${handleNode(node.statement)}\nend while`;
+}
+
 function createStatementHandlers() {
 	return {
 		[ts.SyntaxKind.ForStatement]: handleForStatement,
 		[ts.SyntaxKind.ForOfStatement]: handleForOfStatement,
-		[ts.SyntaxKind.IfStatement]: handleIfStatement
+		[ts.SyntaxKind.IfStatement]: handleIfStatement,
+		[ts.SyntaxKind.ContinueStatement]: (_node: ts.ContinueStatement) => "continue",
+		[ts.SyntaxKind.BreakStatement]: (_node: ts.BreakStatement) => "break",
+		[ts.SyntaxKind.WhileStatement]: handleWhileStatement,
 	};
 }
 

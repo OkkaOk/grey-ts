@@ -2,6 +2,9 @@ import ts from "typescript";
 import { handleNode } from "../transpiler.js";
 
 function handlePropertyAssignment(node: ts.PropertyAssignment): string {
+	if (ts.isNumericLiteral(node.name))
+		return `${handleNode(node.name)}: ${handleNode(node.initializer)}`;
+
 	return `\"${handleNode(node.name)}\": ${handleNode(node.initializer)}`;
 }
 

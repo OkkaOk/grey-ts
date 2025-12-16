@@ -184,6 +184,7 @@ export const apiNameMap: Record<string, string> = {
 
 export let program: ts.Program;
 export let checker: ts.TypeChecker;
+const currFiles: string[] = [];
 
 type Mode = "ts" | "js";
 
@@ -247,14 +248,17 @@ export function handleNode(node: ts.Node) {
 	return "";
 }
 
-export function transpileModule(relativePath: string, basePath = __dirname) {
+export function transpileModule(relativePath: string, basePath?: string) {
+	if (!basePath && currFiles.length) basePath = path.dirname(currFiles[currFiles.length - 1]);
+	if (!basePath) basePath = __dirname;
+
 	// console.log(relativePath, basePath, __dirname)
 	let filePath = path.resolve(basePath, relativePath);
 	const extname = path.extname(filePath);
 	if (!extname) filePath = filePath + ".ts";
 
 	if (!fs.existsSync(filePath)) {
-		console.error(`Error: file '${filePath}' doesn't exist`)
+		console.error(`Error: file '${filePath}' doesn't exist`);
 		process.exit(1);
 	}
 
@@ -273,7 +277,11 @@ export function transpileModule(relativePath: string, basePath = __dirname) {
 	const code = fs.readFileSync(filePath, { encoding: "utf-8" });
 	const sourceFile = parseCode(fileName, code);
 
-	return transpile(sourceFile, filePath);
+	currFiles.push(filePath);
+	const result = transpile(sourceFile, filePath);
+	currFiles.pop();
+
+	return result;
 }
 
 export function transpile(sourceFile: ts.SourceFile, cachePath: string): string {
