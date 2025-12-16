@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { apiNameMap, declaredFunctions } from "../transpiler.ts";
+import { apiNameMap, declaredFunctions } from "../transpiler.js";
 
 function handleIdentifier(node: ts.Identifier): string {
 	let name = apiNameMap[node.text] ?? node.text;
@@ -7,7 +7,7 @@ function handleIdentifier(node: ts.Identifier): string {
 	return name;
 }
 
-export function createIdentifierHandlers() {
+function createIdentifierHandlers() {
 	return {
 		[ts.SyntaxKind.NumericLiteral]: (node: ts.NumericLiteral) => node.text,
 		[ts.SyntaxKind.StringLiteral]: (node: ts.StringLiteral) => `"${node.text}"`,

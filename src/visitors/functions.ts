@@ -1,7 +1,7 @@
 import ts from "typescript";
-import { declaredFunctions, handleNode } from "../transpiler.ts";
+import { declaredFunctions, handleNode } from "../transpiler.js";
 
-function transpileFunctionBody(node: Pick<ts.FunctionDeclaration, "parameters" | "body">) {
+function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.FunctionDeclaration["parameters"] }) {
 	const params = node.parameters.map(param => handleNode(param.name)).join(", ");
 	const body = node.body ? handleBlock(node.body) : "";
 
@@ -44,7 +44,7 @@ function handleArrowFunction(node: ts.ArrowFunction): string {
 	return `function(${params})\n\t${body}\nend function`;
 }
 
-export function createFunctionHandlers() {
+function createFunctionHandlers() {
 	return {
 		[ts.SyntaxKind.Block]: handleBlock,
 		[ts.SyntaxKind.Constructor]: handleConstructor,

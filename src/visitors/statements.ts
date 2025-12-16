@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler.ts";
+import { handleNode } from "../transpiler.js";
 
 function handleForStatement(node: ts.ForStatement): string {
 	if (!node.condition || !node.initializer || !node.incrementor) {
@@ -34,7 +34,7 @@ function handleIfStatement(node: ts.IfStatement): string {
 	return output;
 }
 
-export function createStatementHandlers() {
+function createStatementHandlers() {
 	return {
 		[ts.SyntaxKind.ForStatement]: handleForStatement,
 		[ts.SyntaxKind.ForOfStatement]: handleForOfStatement,

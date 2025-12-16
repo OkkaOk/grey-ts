@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { transpileModule } from "../transpiler.ts";
+import { transpileModule } from "../transpiler.js";
 
 function handleImportDeclaration(node: ts.ImportDeclaration): string {
 	// console.log(node.importClause);
@@ -15,7 +15,7 @@ function handleImportDeclaration(node: ts.ImportDeclaration): string {
 	return transpileModule(moduleSpecifier);
 }
 
-export function createImportHandlers() {
+function createImportHandlers() {
 	return {
 		[ts.SyntaxKind.ImportDeclaration]: handleImportDeclaration
 	};

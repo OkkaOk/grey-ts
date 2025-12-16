@@ -1,59 +1,189 @@
 import { hash } from "node:crypto";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript";
-import parseCode from "./parser.ts";
+import parseCode from "./parser.js";
 
-import createAssignmentHandlers from "./visitors/assignments.ts";
-import createClassHandlers from "./visitors/classes.ts";
-import createExpressionHandlers from "./visitors/expressions.ts";
-import createFunctionHandlers from "./visitors/functions.ts";
-import createIdentifierHandlers from "./visitors/identifiers.ts";
-import createImportHandlers from "./visitors/imports.ts";
-import createStatementHandlers from "./visitors/statements.ts";
-import createVariableHandlers from "./visitors/variables.ts";
+import createAssignmentHandlers from "./visitors/assignments.js";
+import createClassHandlers from "./visitors/classes.js";
+import createExpressionHandlers from "./visitors/expressions.js";
+import createFunctionHandlers from "./visitors/functions.js";
+import createIdentifierHandlers from "./visitors/identifiers.js";
+import createImportHandlers from "./visitors/imports.js";
+import createStatementHandlers from "./visitors/statements.js";
+import createVariableHandlers from "./visitors/variables.js";
 
 export const apiNameMap: Record<string, string> = {
-	print: "print",
-	getType: "typeof",
-	getShell: "get_shell",
-	hostComputer: "host_computer",
-	localIp: "local_ip",
-	publicIp: "public_ip",
-	connectService: "connect_service",
-	startTerminal: "start_terminal",
-	isBinary: "is_binary",
-	isFolder: "is_folder",
-	isSymlink: "is_symlink",
-	hasPermission: "has_permission",
-	getFiles: "get_files",
-	getFolders: "get_folders",
-	getContent: "get_content",
-	setContent: "set_content",
-	setGroup: "set_group",
-	setOwner: "set_owner",
-	isClosed: "is_closed",
-	getLanIp: "get_lan_ip",
-	getName: "get_name",
-	createFolder: "create_folder",
+	// AptClient
+	addRepo: "add_repo",
+	checkUpgrade: "check_upgrade",
+	delRepo: "del_repo",
+	// Blockchain
+	amountMined: "amount_mined",
+	coinPrice: "coin_price",
+	createWallet: "create_wallet",
+	deleteCoin: "delete_coin",
+	getCoin: "get_coin",
+	getCoinName: "get_coin_name",
+	loginWallet: "login_wallet",
+	showHistory: "show_history",
+	// Coin
+	createSubwallet: "create_subwallet",
+	getAddress: "get_address",
+	getCycle_mining: "get_cycle_mining",
+	getMinedCoins: "get_mined_coins",
+	getReward: "get_reward",
+	getSubwallet: "get_subwallet",
+	getSubwallets: "get_subwallets",
+	resetPassword: "reset_password", // Also in Wallet
+	setAddress: "set_address",
+	setCycle_mining: "set_cycle_mining",
+	setReward: "set_reward",
+	// Computer
+	file: "File",
 	activeNetCard: "active_net_card",
 	changePassword: "change_password",
 	closeProgram: "close_program",
 	connectEthernet: "connect_ethernet",
 	connectWifi: "connect_wifi",
+	createFolder: "create_folder",
 	createGroup: "create_group",
 	createUser: "create_user",
 	deleteGroup: "delete_group",
 	deleteUser: "delete_user",
+	getName: "get_name",
 	getPorts: "get_ports",
 	isNetworkActive: "is_network_active",
+	localIp: "local_ip", // Also in router
 	networkDevices: "network_devices",
 	networkGateway: "network_gateway",
+	publicIp: "public_ip", // Also in router
 	showProcs: "show_procs",
 	wifiNetworks: "wifi_networks",
-	file: "File",
+	// Crypto
+	isEncrypted: "is_encrypted",
+	smtpUserList: "smtp_user_list",
+	// Ctfevent
+	getCreatorName: "get_creator_name",
+	getDescription: "get_description",
+	getMailContent: "get_mail_content",
+	getTemplate: "get_template",
+	playerSuccess: "player_success",
+	// DebugLibrary
+	applyPatch: "apply_patch",
+	unitTesting: "unit_testing",
+	// File
+	allowImport: "allow_import",
+	getContent: "get_content",
+	getFiles: "get_files",
+	getFolders: "get_folders",
+	hasPermission: "has_permission",
+	isBinary: "is_binary",
+	isFolder: "is_folder",
+	isSymlink: "is_symlink",
+	setContent: "set_content",
+	setGroup: "set_group",
+	setOwner: "set_owner",
+	// General
+	activeUser: "active_user",
+	clearScreen: "clear_screen",
+	commandInfo: "command_info",
+	currentDate: "current_date",
+	currentPath: "current_path",
+	formatColumns: "format_columns",
+	getAbsPath: "get_abs_path",
+	getCtf: "get_ctf",
+	getCustomObject: "get_custom_object",
+	getRouter: "get_router",
+	getShell: "get_shell",
+	getSwitch: "get_switch",
+	homeDir: "home_dir",
+	importCode: "import_code",
+	includeLib: "include_lib",
+	isLanIp: "is_lan_ip",
+	isValidIp: "is_valid_ip",
+	launchPath: "launch_path",
+	mailLogin: "mail_login",
+	parentPath: "parent_path",
+	programPath: "program_path",
+	resetCtfPassword: "reset_ctf_password",
+	getType: "typeof",
+	isType: "is_type", // custom
+	userBankNumber: "user_bank_number",
+	userInput: "user_input",
+	userMailAddress: "user_mail_address",
+	// MetaLib
+	debugTools: "debug_tools",
+	isPatched: "is_patched",
+	libName: "lib_name",
+	// MetaMail
+	// Metaxploit
+	netUse: "net_use",
+	rshellClient: "rshell_client",
+	rshellServer: "rshell_server",
+	scanAddress: "scan_address",
+	// NetSession
+	dumpLib: "dump_lib",
+	floodConnection: "flood_connection",
+	getNumConnGateway: "get_num_conn_gateway",
+	getNumPortforward: "get_num_portforward",
+	getNumUsers: "get_num_users",
+	isAnyActiveUser: "is_any_active_user",
+	isRootActiveUser: "is_root_active_user",
+	// Port
+	getLanIp: "get_lan_ip",
+	isClosed: "is_closed",
+	portNumber: "port_number",
+	// Router
+	bssidName: "bssid_name",
+	devicePorts: "device_ports",
+	devicesLanIp: "devices_lan_ip",
+	essidName: "essid_name",
+	firewallRules: "firewall_rules",
+	kernelVersion: "kernel_version",
+	pingPort: "ping_port",
+	portInfo: "port_info",
+	usedPorts: "used_ports",
+	// Service
+	installService: "install_service",
+	startService: "start_service",
+	stopService: "stop_service",
+	// Shell
+	connectService: "connect_service",
+	hostComputer: "host_computer",
+	startTerminal: "start_terminal",
+	// SmartAppliance
+	overrideSettings: "override_settings",
+	setAlarm: "set_alarm",
+	// string
+	isMatch: "is_match",
+	toInt: "to_int",
+	// SubWallet
+	checkPassword: "check_password",
+	getBalance: "get_balance", // Also in wallet
+	getInfo: "get_info",
+	getUser: "get_user",
+	lastTransaction: "last_transaction",
+	setInfo: "set_info",
+	walletUsername: "wallet_username",
+	// TrafficNet
+	cameraLinkSystem: "camera_link_system",
+	getCredentialsInfo: "get_credentials_info",
+	locateVehicle: "locate_vehicle",
+	// Wallet
+	buyCoin: "buy_coin",
+	cancelPendingTrade: "cancel_pending_trade",
+	getGlobalOffers: "get_global_offers",
+	getPendingTrade: "get_pending_trade",
+	getPin: "get_pin",
+	listCoins: "list_coins",
+	listGlobalCoins: "list_global_coins",
+	sellCoin: "sell_coin",
+	showNodes: "show_nodes",
 } as const;
 
-const decoder = new TextDecoder();
+export let program: ts.Program;
+export let checker: ts.TypeChecker;
 
 type Mode = "ts" | "js";
 
@@ -100,6 +230,7 @@ export function createAnonFunction(body: string, params: string) {
 }
 
 export function handleNode(node: ts.Node) {
+	// console.log(ts.SyntaxKind[node.kind]);
 	try {
 		const handler = handlers[node.kind];
 		if (handler) return handler(node);
@@ -116,34 +247,42 @@ export function handleNode(node: ts.Node) {
 	return "";
 }
 
-export function transpileModule(relativePath: string, basePath = import.meta.dirname!) {
+export function transpileModule(relativePath: string, basePath = __dirname) {
+	// console.log(relativePath, basePath, __dirname)
 	let filePath = path.resolve(basePath, relativePath);
 	const extname = path.extname(filePath);
 	if (!extname) filePath = filePath + ".ts";
 
+	if (!fs.existsSync(filePath)) {
+		console.error(`Error: file '${filePath}' doesn't exist`)
+		process.exit(1);
+	}
+
 	const fileName = path.basename(filePath);
+
+	if (cache.size === 0) {
+		program = ts.createProgram({ rootNames: [filePath], options: {} });
+		checker = program.getTypeChecker();
+		handlers = createHandlers();
+	}
 
 	// Everything is bundled so this should already be in the file.
 	// TODO: better system
 	if (cache.has(filePath)) return "";
 
-	const code = decoder.decode(Deno.readFileSync(filePath));
+	const code = fs.readFileSync(filePath, { encoding: "utf-8" });
 	const sourceFile = parseCode(fileName, code);
 
 	return transpile(sourceFile, filePath);
 }
 
 export function transpile(sourceFile: ts.SourceFile, cachePath: string): string {
-	if (!Object.keys(handlers).length) {
-		handlers = createHandlers();
-	}
-
 	const isEntry = cache.size === 0;
 	cache.set(cachePath, []);
 
 	const statements = sourceFile.statements.map(value => handleNode(value));
 	if (utilFunctions.size) {
-		statements.unshift(...utilFunctions.values().toArray());
+		statements.unshift(...Array.from(utilFunctions.values()));
 		utilFunctions.clear();
 	}
 

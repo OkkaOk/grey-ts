@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler.ts";
+import { handleNode } from "../transpiler.js";
 
 function handleClassDeclaration(node: ts.ClassDeclaration): string {
 	const name = node.name ? node.name.text : "anon";
@@ -23,7 +23,7 @@ function handleClassDeclaration(node: ts.ClassDeclaration): string {
 	return output;
 }
 
-export function createClassHandlers() {
+function createClassHandlers() {
 	return {
 		[ts.SyntaxKind.ClassDeclaration]: handleClassDeclaration,
 	};

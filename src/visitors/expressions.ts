@@ -1,8 +1,20 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler.ts";
+import { apiNameMap, handleNode } from "../transpiler.js";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression): string {
-	return `${handleNode(node.expression)}.${handleNode(node.name)}`;
+	const output = `${handleNode(node.expression)}.${handleNode(node.name)}`;
+	if (output === "String.prototype")
+		return "string";
+	else if (output === "Number.prototype")
+		return "number";
+	else if (output === "Object.prototype")
+		return "map";
+	else if (output === "Array.prototype")
+		return "list";
+	else if (output === "Function.prototype")
+		return "funcRef";
+
+	return output
 }
 
 function handleCallExpression(node: ts.CallExpression): string {
@@ -24,7 +36,7 @@ function handleNewExpression(node: ts.CallExpression): string {
 function handleBinaryExpression(node: ts.BinaryExpression): string {
 	let operatorToken = ts.tokenToString(node.operatorToken.kind) || node.operatorToken.getText();
 	if (operatorToken == "+=" || operatorToken == "-=")
-		return `${handleNode(node.left)} = ${handleNode(node.left)} ${operatorToken[0]} ${handleNode(node.right)}`
+		return `${handleNode(node.left)} = ${handleNode(node.left)} ${operatorToken[0]} ${handleNode(node.right)}`;
 
 	if (operatorToken == "**") operatorToken = "^";
 	else if (operatorToken == "||") operatorToken = "or";
@@ -61,6 +73,11 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression): string
 }
 
 function handleElementAccessExpression(node: ts.ElementAccessExpression): string {
+	if (ts.isStringLiteral(node.argumentExpression)) {
+		const key = node.argumentExpression.text;
+		return `${handleNode(node.expression)}.${apiNameMap[key] ?? key}`;
+	}
+
 	return `${handleNode(node.expression)}[${handleNode(node.argumentExpression)}]`;
 }
 
@@ -91,7 +108,7 @@ function handleTemplateSpan(node: ts.TemplateSpan): string {
 
 function handleConditionalExpression(node: ts.ConditionalExpression): string {
 	if (node.parent.kind === ts.SyntaxKind.CallExpression) {
-		throw new Error("Conditional expressions are not supported inside call expressions.")
+		throw new Error("Conditional expressions are not supported inside call expressions.");
 	}
 
 	return `\
@@ -99,10 +116,10 @@ if (${handleNode(node.condition)}) then
 	${handleNode(node.whenTrue)}
 else
 	${handleNode(node.whenFalse)}
-end if`
+end if`;
 }
 
-export function createExpressionHandlers() {
+function createExpressionHandlers() {
 	return {
 		[ts.SyntaxKind.PropertyAccessExpression]: handlePropertyAccessExpression,
 		[ts.SyntaxKind.CallExpression]: handleCallExpression,

@@ -1,0 +1,43 @@
+{
+	"name": "grey-ts",
+	"version": "0.1.0",
+	"description": "Transpiles TypeScript into GreyScript",
+	"engines": {
+		"node": ">=20.17.0"
+	},
+	"keywords": [
+		"transpiler",
+		"greyhack",
+		"greyts",
+		"greyscript",
+		"typescript"
+	],
+	"homepage": "https://github.com/OkkaOk/grey-ts#readme",
+	"bugs": {
+		"url": "https://github.com/OkkaOk/grey-ts/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/OkkaOk/grey-ts.git"
+	},
+	"license": "MIT",
+	"author": "Okka",
+	"type": "commonjs",
+	"bin": {
+		"greyts": "dist/index.js"
+	},
+	"scripts": {
+		"build": "npx tsc --build --clean && npx tsc",
+		"transpile": "node dist/index.js"
+	},
+	"files": [
+		"dist"
+	],
+	"dependencies": {
+		"greybel-js": "^3.7.10",
+		"typescript": "^5.9.3"
+	},
+	"devDependencies": {
+		"@types/node": "^25.0.2"
+	}
+}
