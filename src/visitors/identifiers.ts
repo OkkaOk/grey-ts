@@ -1,9 +1,16 @@
 import ts from "typescript";
-import { apiNameMap, declaredFunctions } from "../transpiler.js";
+import { apiNameMap } from "../replaceKeywords";
+import { checker, type TranspileContext } from "../transpiler";
 
-function handleIdentifier(node: ts.Identifier): string {
-	let name = apiNameMap[node.text] ?? node.text;
-	if (declaredFunctions[name]) name = "@" + name;
+function handleIdentifier(node: ts.Identifier, _ctx: TranspileContext): string {
+	const type = checker.getTypeAtLocation(node);
+	// const typeStr = checker.typeToString(type);
+	const symbol = type.getSymbol();
+	const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
+	console.log(ts.SyntaxKind[node.kind], node.text, symbolFullName);
+
+	let name = apiNameMap[symbolFullName] ?? node.text;
+
 	return name;
 }
 

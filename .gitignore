@@ -1,8 +1,5 @@
-*
-!src
-!.gitignore
-!LICENSE
-!package.json
-!package-lock.json
-!tsconfig.json
-!.npmrc
+node_modules
+dist
+.env
+.vscode
+*.tgz

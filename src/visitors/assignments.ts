@@ -1,11 +1,18 @@
 import ts from "typescript";
-import { handleNode } from "../transpiler.js";
+import { checker, handleNode, type TranspileContext } from "../transpiler";
 
-function handlePropertyAssignment(node: ts.PropertyAssignment): string {
-	if (ts.isNumericLiteral(node.name))
-		return `${handleNode(node.name)}: ${handleNode(node.initializer)}`;
+function handlePropertyAssignment(node: ts.PropertyAssignment, ctx: TranspileContext): string {
+	const rightType = checker.getTypeAtLocation(node.initializer);
+	const callSignatures = rightType.getCallSignatures();
 
-	return `\"${handleNode(node.name)}\": ${handleNode(node.initializer)}`;
+	let right = handleNode(node.initializer, ctx);
+	if (callSignatures.length && callSignatures[0].parameters) 
+		right = "@" + right
+	
+	if (ts.isNumericLiteral(node.name) || ts.isStringLiteral(node.name))
+		return `${handleNode(node.name, ctx)}: ${right}`;
+
+	return `\"${handleNode(node.name, ctx)}\": ${right}`;
 }
 
 // function handleSpreadElement(node: ts.SpreadElement): string {
