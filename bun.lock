@@ -3,9 +3,10 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "grey-ts",
+      "name": "@grey-ts/transpiler",
       "dependencies": {
         "greybel-js": "^3.7.10",
+        "@grey-ts/types": "https://github.com/OkkaOk/grey-ts-types",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -17,6 +18,8 @@
   },
   "packages": {
     "@babel/runtime-corejs3": ["@babel/runtime-corejs3@7.28.4", "", { "dependencies": { "core-js-pure": "^3.43.0" } }, "sha512-h7iEYiW4HebClDEhtvFObtPmIvrd1SSfpI9EhOeKk4CtIK/ngBWFpuhCzhdmRKtg71ylcue+9I6dv54XYO1epQ=="],
+
+    "@grey-ts/types": ["@grey-ts/types@github:OkkaOk/grey-ts-types#4f3fd1c", {}, "OkkaOk-grey-ts-types-4f3fd1c"],
 
     "@hapi/hoek": ["@hapi/hoek@9.3.0", "", {}, "sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ=="],
 

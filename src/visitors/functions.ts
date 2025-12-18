@@ -1,7 +1,7 @@
 import ts from "typescript";
-import { declaredFunctions, handleNode, type TranspileContext } from "../transpiler";
+import { handleNode, type TranspileContext } from "../transpiler";
 
-function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration> }, ctx: TranspileContext) {
+function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration>; }, ctx: TranspileContext) {
 	const params = node.parameters.map(param => handleNode(param.name, ctx)).join(", ");
 	const body = node.body ? handleBlock(node.body, ctx) : "";
 
@@ -24,9 +24,10 @@ function handleMethodDeclaration(node: ts.MethodDeclaration, ctx: TranspileConte
 }
 
 function handleFunctionDeclaration(node: ts.FunctionDeclaration, ctx: TranspileContext): string {
-	const name = node.name ? node.name.text : "anon";
-	declaredFunctions[name] = true;
+	if (node.modifiers?.some(m => m.kind === ts.SyntaxKind.DeclareKeyword))
+		return "";
 
+	const name = node.name ? node.name.text : "anon";
 	return `${name} = ${transpileFunctionBody(node, ctx)}`;
 }
 
@@ -34,17 +35,18 @@ function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): str
 	// if (ts.isBinaryExpression(node.parent) && !Object.is(node.parent.right, node)) {
 	// 	throw new Error("Inline arrow functions are not supported.");
 	// }
-	if (ts.isVariableDeclaration(node.parent)) {
-		declaredFunctions[handleNode(node.parent.name, ctx)] = true
+	if (!ts.isVariableDeclaration(node.parent) && !ts.isBinaryExpression(node.parent)) {
+		throw new Error("Inline anonymous arrow functions are not supported yet.");
 	}
-	else if (!ts.isBinaryExpression(node.parent)){
-		throw new Error("Inline arrow functions are not supported.");
-	}
-	
+
 	const params = node.parameters.map(param => handleNode(param.name, ctx)).join(", ");
 	const body = ts.isBlock(node.body) ? handleNode(node.body, ctx) : `return ${handleNode(node.body, ctx)}`;
 
 	return `function(${params})\n\t${body}\nend function`;
+}
+
+function handleFunctionExpression(node: ts.FunctionExpression, ctx: TranspileContext): string {
+	return transpileFunctionBody(node, ctx);
 }
 
 function createFunctionHandlers() {
@@ -53,7 +55,8 @@ function createFunctionHandlers() {
 		[ts.SyntaxKind.Constructor]: handleConstructor,
 		[ts.SyntaxKind.MethodDeclaration]: handleMethodDeclaration,
 		[ts.SyntaxKind.FunctionDeclaration]: handleFunctionDeclaration,
-		[ts.SyntaxKind.ArrowFunction]: handleArrowFunction
+		[ts.SyntaxKind.ArrowFunction]: handleArrowFunction,
+		[ts.SyntaxKind.FunctionExpression]: handleFunctionExpression,
 	};
 }
 

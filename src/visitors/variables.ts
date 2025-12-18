@@ -1,26 +1,19 @@
 import ts from "typescript";
-import { checker, handleNode, type TranspileContext } from "../transpiler";
+import { handleNode, type TranspileContext } from "../transpiler";
+import { asRef, nodeIsFunction } from "../utils";
 
 function handleVariableDeclaration(
-	node: { name: ts.BindingName | ts.PropertyName, initializer?: ts.Expression; },
+	node: ts.VariableDeclaration | ts.PropertyDeclaration,
 	ctx: TranspileContext
 ): string {
 	let right = node.initializer ? (handleNode(node.initializer, ctx) || "null") : "null";
-
-	if (right != "null") {
-		const rightType = checker.getTypeAtLocation(node.initializer!);
-		const callSignatures = rightType.getCallSignatures();
-
-		if (callSignatures.length && callSignatures[0].parameters)
-			right = "@" + right;
+	if (right != "null" && nodeIsFunction(node.initializer!)) {
+		right = asRef(right);
 	}
 
 	let left = handleNode(node.name, ctx);
-	const leftType = checker.getTypeAtLocation(node.initializer!);
-	const callSignatures = leftType.getCallSignatures();
-
-	if (callSignatures.length && callSignatures[0].parameters)
-		left = "@" + left;
+	if (nodeIsFunction(node))
+		left = asRef(left);
 
 	return `${left} = ${right}`;
 }

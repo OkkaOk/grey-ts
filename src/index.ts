@@ -2,7 +2,7 @@
 
 import * as fs from "node:fs";
 import path from "node:path";
-import { transpileEntryFile } from "./transpiler.js";
+import { transpileProgram } from "./transpiler.js";
 
 let noMoreFlags = false;
 let command = "";
@@ -10,7 +10,7 @@ const flags: string[] = [];
 const args: string[] = [];
 
 for (let i = 2; i < process.argv.length; i++) {
-	const arg = process.argv[i];
+	const arg = process.argv[i]!;
 	if (arg === "--") {
 		noMoreFlags = true;
 		continue;
@@ -49,8 +49,8 @@ if (command === "transpile") {
 		process.exit(2);
 	}
 
-	const entryFile = args[0];
-	const output = transpileEntryFile(entryFile);
+	const entryFile = args[0]!;
+	const output = transpileProgram(entryFile);
 	
 	if (flags.includes("--print") || flags.includes("-p")) {
 		console.log(output);
@@ -59,9 +59,11 @@ if (command === "transpile") {
 		const outDirPath = `${root}/out`;
 		if (!fs.existsSync(outDirPath))
 			fs.mkdirSync(outDirPath);
+
+		const outFileName = args.length > 1 ? args[1]! : "output.gs"
 	
 		// TODO: split to multiple if over 160k characters. Or let greybel handle it?
-		const outFilePath = outDirPath + "/output.gs";
+		const outFilePath = path.join(outDirPath, outFileName);
 	
 		fs.writeFileSync(outFilePath, output);
 	}

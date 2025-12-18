@@ -1,18 +1,25 @@
 import ts from "typescript";
-import { checker, handleNode, type TranspileContext } from "../transpiler";
+import { handleNode, type TranspileContext } from "../transpiler";
+import { asRef, nodeIsFunction } from "../utils";
 
 function handlePropertyAssignment(node: ts.PropertyAssignment, ctx: TranspileContext): string {
-	const rightType = checker.getTypeAtLocation(node.initializer);
-	const callSignatures = rightType.getCallSignatures();
-
 	let right = handleNode(node.initializer, ctx);
-	if (callSignatures.length && callSignatures[0].parameters) 
-		right = "@" + right
+	if (nodeIsFunction(node.initializer)) 
+		right = asRef(right);
 	
-	if (ts.isNumericLiteral(node.name) || ts.isStringLiteral(node.name))
+	if (ts.isNumericLiteral(node.name) || ts.isStringLiteral(node.name) || ts.isComputedPropertyName(node.name))
 		return `${handleNode(node.name, ctx)}: ${right}`;
 
 	return `\"${handleNode(node.name, ctx)}\": ${right}`;
+}
+
+function handleShorthandPropertyAssignment(node: ts.ShorthandPropertyAssignment, ctx: TranspileContext): string {
+	const name = handleNode(node.name, ctx);
+	return `\"${name}\": ${nodeIsFunction(node.name) ? asRef(name) : name}`;
+}
+
+function handleComputedPropertyName(node: ts.ComputedPropertyName, ctx: TranspileContext): string {
+	return handleNode(node.expression, ctx);
 }
 
 // function handleSpreadElement(node: ts.SpreadElement): string {
@@ -27,6 +34,8 @@ function handlePropertyAssignment(node: ts.PropertyAssignment, ctx: TranspileCon
 function createAssignmentHandlers() {
 	return {
 		[ts.SyntaxKind.PropertyAssignment]: handlePropertyAssignment,
+		[ts.SyntaxKind.ShorthandPropertyAssignment]: handleShorthandPropertyAssignment,
+		[ts.SyntaxKind.ComputedPropertyName]: handleComputedPropertyName,
 		// [ts.SyntaxKind.SpreadElement]: handleSpreadElement,
 		// [ts.SyntaxKind.SpreadAssignment]: handleSpreadAssignment,
 	};

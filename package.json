@@ -1,5 +1,5 @@
 {
-	"name": "grey-ts",
+	"name": "@grey-ts/transpiler",
 	"version": "0.1.0",
 	"author": "Okka",
 	"module": "src/index.ts",
@@ -24,12 +24,18 @@
 		"type": "git",
 		"url": "git+https://github.com/OkkaOk/grey-ts.git"
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "bun run scripts/build.ts"
+	},
 	"devDependencies": {
 		"@types/bun": "latest"
 	},
 	"peerDependencies": {
-		"typescript": "^5"
+		"typescript": "^5",
+		"@grey-ts/types": "https://github.com/OkkaOk/grey-ts-types"
 	},
 	"dependencies": {
 		"greybel-js": "^3.7.10"

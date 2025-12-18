@@ -1,22 +1,24 @@
 import ts from "typescript";
 import { apiNameMap } from "../replaceKeywords";
-import { checker, handleNode, type TranspileContext } from "../transpiler";
+import { checker, handleNode, utilFunctions, type TranspileContext } from "../transpiler";
+import { asRef, nodeIsFunction } from "../utils";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: TranspileContext): string {
 	const left = handleNode(node.expression, ctx);
 	// const right = handleNode(node.name, ctx);
 
 	const leftType = checker.getTypeAtLocation(node.expression);
-	const symbol = leftType.getProperty(node.name.text)
+	const symbol = leftType.getProperty(node.name.text);
 	const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
 
 	const right = apiNameMap[symbolFullName] ?? node.name.text;
-	// console.log(ts.SyntaxKind[node.kind], node.getText(), symbolFullName, right);
+	const isFunction = nodeIsFunction(node.name);
+	// console.log(ts.SyntaxKind[node.kind], node.getText(), symbolFullName, right, isFunction);
 
 	// We've imported something like this: import * as lib from "mylib"
 	// Next when we use lib.func() we omit the lib. so it becomes func()
 	if (ctx.namedImports[left])
-		return right;
+		return isFunction ? asRef(right) : right;
 
 	const output = `${left}.${right}`;
 	if (output === "String.prototype")
@@ -30,21 +32,58 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 	else if (output === "Function.prototype")
 		return "funcRef";
 
-	
 
-	return output
+
+	return isFunction ? asRef(output) : output;
+}
+
+/** Modifies the args to fit if there are rest parameters so it puts them in an array. */
+function modifyArgs(args: string[], parameters: readonly ts.Symbol[]) {
+	for (let i = 0; i < parameters.length || 0; i++) {
+		const param = parameters[i]!;
+		if (!param.valueDeclaration) continue;
+
+		if (ts.isParameter(param.valueDeclaration) && param.valueDeclaration.dotDotDotToken) {
+			if (args.length <= i) args.push(...new Array(i - args.length).fill("null"));
+
+			args[i] = `[${args.splice(i).join(", ")}]`;
+			break;
+		}
+	}
+
+	return args;
 }
 
 function handleCallExpression(node: ts.CallExpression, ctx: TranspileContext): string {
-	// console.log(node);
-	const args = node.arguments.map(arg => handleNode(arg, ctx)).join(", ");
-	return `${handleNode(node.expression, ctx)}(${args})`;
+	ctx.inFunctionCall = true;
+	const args = node.arguments.map(arg => handleNode(arg, ctx));
+	ctx.inFunctionCall = false;
+
+	const type = checker.getTypeAtLocation(node.expression);
+	const callParams = type.getCallSignatures()[0]?.parameters || [];
+	modifyArgs(args, callParams);
+
+	const name = handleNode(node.expression, ctx);
+	if (name === "is_type" && !utilFunctions.has("is_type")) {
+		utilFunctions.set("is_type", "is_type = function(value, type)\nif typeof(value) == type then return true\nreturn false\nend function");
+	}
+	else if (name === "Object.assign") {
+		return `(${args.join(" + ")})`;
+	}
+
+	return `${name}(${args.join(", ")})`;
 }
 
 function handleNewExpression(node: ts.NewExpression, ctx: TranspileContext): string {
-	const params = node.arguments?.map(arg => handleNode(arg, ctx)) || [];
-	const output = `(new ${handleNode(node.expression, ctx)}).constructor(${params.join(",")})`;
+	ctx.inFunctionCall = true;
+	const args = node.arguments?.map(arg => handleNode(arg, ctx)) || [];
+	ctx.inFunctionCall = false;
 
+	const type = checker.getTypeAtLocation(node.expression);
+	const constructArgs = type.getConstructSignatures()[0]?.parameters || [];
+	modifyArgs(args, constructArgs);
+
+	const output = `(new ${handleNode(node.expression, ctx)}).constructor(${args.join(",")})`;
 	return output;
 }
 
@@ -85,7 +124,7 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 	if (operator == "+")
 		return `${operand}.val()`;
 
-	throw new Error(`Couldn't handle this UnaryExpression: ${node.getText()}`)
+	throw new Error(`Couldn't handle this UnaryExpression: ${node.getText()}`);
 }
 
 function handleArrayLiteralExpression(node: ts.ArrayLiteralExpression, ctx: TranspileContext): string {
@@ -98,17 +137,20 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 }
 
 function handleElementAccessExpression(node: ts.ElementAccessExpression, ctx: TranspileContext): string {
+	let right: string;
+
 	if (ts.isStringLiteral(node.argumentExpression)) {
 		const leftType = checker.getTypeAtLocation(node.expression);
-		const symbol = leftType.getProperty(node.argumentExpression.text)
+		const symbol = leftType.getProperty(node.argumentExpression.text);
 		const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
 
-		const right = apiNameMap[symbolFullName] ?? node.argumentExpression.text;
-
-		return `${handleNode(node.expression, ctx)}.${right}`;
+		right = `"${apiNameMap[symbolFullName] ?? node.argumentExpression.text}"`;
+	}
+	else {
+		right = handleNode(node.argumentExpression, ctx);
 	}
 
-	return `${handleNode(node.expression, ctx)}[${handleNode(node.argumentExpression, ctx)}]`;
+	return `${handleNode(node.expression, ctx)}[${right}]`;
 }
 
 // e.g. `Hello ${name}`
@@ -162,10 +204,10 @@ function createExpressionHandlers() {
 				// We're inside a constructor
 				if (ts.findAncestor(node, (n) => ts.isConstructorDeclaration(n)))
 					return "return self";
-				
+
 				return "return";
 			}
-			
+
 			return `return ${handleNode(node.expression, ctx)}`;
 		},
 		[ts.SyntaxKind.ParenthesizedExpression]: handleParenthesizedExpression,

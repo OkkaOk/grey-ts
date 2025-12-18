@@ -1,15 +1,19 @@
 import ts from "typescript";
 import { apiNameMap } from "../replaceKeywords";
 import { checker, type TranspileContext } from "../transpiler";
+import { asRef, nodeIsFunction } from "../utils";
 
-function handleIdentifier(node: ts.Identifier, _ctx: TranspileContext): string {
+function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 	const type = checker.getTypeAtLocation(node);
 	// const typeStr = checker.typeToString(type);
 	const symbol = type.getSymbol();
 	const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
-	console.log(ts.SyntaxKind[node.kind], node.text, symbolFullName);
+	// console.log(ts.SyntaxKind[node.kind], node.text, symbolFullName);
 
 	let name = apiNameMap[symbolFullName] ?? node.text;
+
+	// Alternatively could check if the parent is a CallExpression or NewExpression
+	if (ctx.inFunctionCall && nodeIsFunction(node)) name = asRef(name);
 
 	return name;
 }

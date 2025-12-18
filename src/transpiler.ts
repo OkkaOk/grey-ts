@@ -2,7 +2,6 @@ import { hash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript";
-import parseCode from "./parser.js";
 
 import createAssignmentHandlers from "./visitors/assignments.js";
 import createClassHandlers from "./visitors/classes.js";
@@ -22,15 +21,15 @@ export type TranspileContext = {
 	currentFilePath: string;
 	currentFolder: string;
 	namedImports: Record<string, boolean>;
+	inFunctionCall?: boolean;
 	basePath?: string;
 	mode?: Mode;
 	cache: Map<string, string[]>;
 };
 
 let handlers: Record<number, (node: ts.Node, ctx: TranspileContext) => string> = {};
-const utilFunctions = new Map<string, string>();
 
-export const declaredFunctions: Record<string, boolean> = {};
+export const utilFunctions = new Map<string, string>();
 
 function createHandlers() {
 	const result: typeof handlers = {};
@@ -82,10 +81,10 @@ export function handleNode(node: ts.Node, ctx: TranspileContext) {
 	return "";
 }
 
-export function transpileEntryFile(entryFileRelativePath: string) {
+export function transpileProgram(entryFileRelativePath: string) {
 	const ctx: TranspileContext = {
 		currentFolder: process.cwd(),
-		currentFilePath: path.join(process.cwd(), entryFileRelativePath),
+		currentFilePath: path.resolve(process.cwd(), entryFileRelativePath),
 		namedImports: {},
 		cache: new Map()
 	};
@@ -95,12 +94,14 @@ export function transpileEntryFile(entryFileRelativePath: string) {
 		process.exit(1);
 	}
 
+	const start = Date.now()
+
 	program = ts.createProgram({
-		rootNames: [ctx.currentFilePath, path.resolve(__dirname, "../globals.d.ts")],
+		rootNames: [ctx.currentFilePath],
 		options: {
 			target: ts.ScriptTarget.Latest,
 			noLib: true,
-			typeRoots: [],
+			types: ["@grey-ts/types"]
 		},
 	});
 
@@ -124,6 +125,7 @@ export function transpileEntryFile(entryFileRelativePath: string) {
 		ctx.currentFolder = path.dirname(source.fileName);
 		ctx.namedImports = {};
 
+		// Todo: Maybe use worker threads if it takes too long to transpile
 		const result = transpileSourceFile(source, ctx);
 		output.push(result);
 	}
@@ -133,39 +135,9 @@ export function transpileEntryFile(entryFileRelativePath: string) {
 		utilFunctions.clear();
 	}
 
+	console.log(`Transpiling took ${Date.now() - start} ms`);
+
 	return output.join("\n");
-}
-
-export function transpileModule(relativePath: string, ctx: TranspileContext) {
-	// console.log(relativePath, basePath, __dirname)
-	let filePath = path.resolve(ctx.currentFolder, relativePath);
-	const extname = path.extname(filePath);
-	if (!extname) filePath = filePath + ".ts";
-
-	if (!fs.existsSync(filePath)) {
-		console.error(`Error: file '${filePath}' doesn't exist`);
-		process.exit(1);
-	}
-
-	const fileName = path.basename(filePath);
-
-	// Everything is bundled so this should already be in the file.
-	// TODO: better system
-	if (ctx.cache.has(filePath)) return "";
-
-	const code = fs.readFileSync(filePath, { encoding: "utf-8" });
-	const sourceFile = parseCode(fileName, code);
-
-	const prevFilePath = ctx.currentFilePath;
-	const prevFolder = ctx.currentFolder;
-
-	ctx.currentFilePath = filePath;
-	ctx.currentFolder = path.dirname(filePath);
-	const result = transpileSourceFile(sourceFile, ctx);
-	ctx.currentFilePath = prevFilePath;
-	ctx.currentFolder = prevFolder;
-
-	return result;
 }
 
 export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext): string {

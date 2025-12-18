@@ -15,7 +15,7 @@ end while`;
 }
 
 function handleForOfStatement(node: ts.ForOfStatement, ctx: TranspileContext): string {
-	const varName = handleNode((node.initializer as ts.VariableDeclarationList).declarations[0].name, ctx);
+	const varName = handleNode((node.initializer as ts.VariableDeclarationList).declarations[0]!.name, ctx);
 	const objToLoop = handleNode(node.expression, ctx);
 
 	return `for ${varName} in ${objToLoop}\n${handleNode(node.statement, ctx)}\nend for`;
