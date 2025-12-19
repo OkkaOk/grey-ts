@@ -24,9 +24,23 @@ function handleClassDeclaration(node: ts.ClassDeclaration, ctx: TranspileContext
 	return output;
 }
 
+function handleGetAccessor(node: ts.GetAccessorDeclaration, ctx: TranspileContext): string {
+	const name = handleNode(node.name, ctx);
+	const body = node.body ? handleNode(node.body, ctx) : "";
+	// console.log(node.getText(), name, node.parameters)
+	return `${name} = function()\n${body}\nend function`;
+}
+
+function handleSetAccessor(node: ts.GetAccessorDeclaration, ctx: TranspileContext): string {
+	const body = node.body ? handleNode(node.body, ctx) : "";
+	return `${handleNode(node.name, ctx)} = function(${handleNode(node.parameters[0]!, ctx)})\n${body}\nend function`;
+}
+
 function createClassHandlers() {
 	return {
 		[ts.SyntaxKind.ClassDeclaration]: handleClassDeclaration,
+		[ts.SyntaxKind.GetAccessor]: handleGetAccessor,
+		[ts.SyntaxKind.SetAccessor]: handleSetAccessor,
 	};
 }
 

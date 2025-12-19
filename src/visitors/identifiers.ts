@@ -1,16 +1,11 @@
 import ts from "typescript";
-import { apiNameMap } from "../replaceKeywords";
-import { checker, type TranspileContext } from "../transpiler";
-import { asRef, nodeIsFunction } from "../utils";
+import { checker, handleNode, type TranspileContext } from "../transpiler";
+import { asRef, nodeIsFunction, replaceIdentifier } from "../utils";
 
 function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 	const type = checker.getTypeAtLocation(node);
-	// const typeStr = checker.typeToString(type);
-	const symbol = type.getSymbol();
-	const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
-	// console.log(ts.SyntaxKind[node.kind], node.text, symbolFullName);
 
-	let name = apiNameMap[symbolFullName] ?? node.text;
+	let name = replaceIdentifier(node.text, type.getSymbol())
 
 	// Alternatively could check if the parent is a CallExpression or NewExpression
 	if (ctx.inFunctionCall && nodeIsFunction(node)) name = asRef(name);
@@ -18,10 +13,18 @@ function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 	return name;
 }
 
+function handleParameter(node: ts.ParameterDeclaration, ctx: TranspileContext): string {
+	const name = handleNode(node.name, ctx);
+	if (!node.initializer) return name;
+
+	return `${name} = ${handleNode(node.initializer, ctx)}`;
+}
+
 function createIdentifierHandlers() {
 	return {
 		[ts.SyntaxKind.NumericLiteral]: (node: ts.NumericLiteral) => node.text,
 		[ts.SyntaxKind.StringLiteral]: (node: ts.StringLiteral) => `"${node.text}"`,
+		[ts.SyntaxKind.Parameter]: handleParameter,
 		[ts.SyntaxKind.Identifier]: handleIdentifier,
 		[ts.SyntaxKind.SuperKeyword]: (node: ts.SuperExpression) => {
 			if (ts.isPropertyAccessExpression(node.parent)) return "super";

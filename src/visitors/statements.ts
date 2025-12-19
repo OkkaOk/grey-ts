@@ -5,10 +5,10 @@ function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): strin
 	if (!node.condition || !node.initializer || !node.incrementor) {
 		throw new Error("Can't transpile this type of for loop.");
 	}
-
+	// TODO: Ugh
 	return `\
 ${handleNode(node.initializer, ctx).split("\n").map(v => v + " - 1").join("\n")}
-while (${handleNode(node.condition, ctx)})
+while (${handleNode(node.condition, ctx)} - 1)
 ${handleNode(node.incrementor, ctx)}
 ${handleNode(node.statement, ctx)}
 end while`;
@@ -26,7 +26,13 @@ function handleIfStatement(node: ts.IfStatement, ctx: TranspileContext): string 
 	// TODO: one liner
 
 	if (node.elseStatement) {
-		output += `\nelse\n${handleNode(node.elseStatement, ctx)}`;
+		if (ts.isIfStatement(node.elseStatement)) {
+			output += `\nelse ${handleIfStatement(node.elseStatement, ctx)}`;
+			return output;
+		}
+		else {
+			output += `\nelse\n${handleNode(node.elseStatement, ctx)}`;
+		}
 	}
 
 	output += "\nend if";

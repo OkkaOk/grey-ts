@@ -15,4 +15,8 @@ describe("Replace Identifiers", () => {
 	test("ip", () => {
 		expect(lines[1]).toEqual("ip = shell.host_computer.local_ip");
 	});
+
+	test("userInput", () => {
+		expect(lines[2]).toEqual("@oldUserInput = @user_input");
+	});
 });

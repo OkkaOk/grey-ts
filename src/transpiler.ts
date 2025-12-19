@@ -1,8 +1,9 @@
 import { hash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import ts from "typescript";
+import ts, { type SourceFile } from "typescript";
 
+import { findProjectRoot } from "./utils.js";
 import createAssignmentHandlers from "./visitors/assignments.js";
 import createClassHandlers from "./visitors/classes.js";
 import createExpressionHandlers from "./visitors/expressions.js";
@@ -25,6 +26,8 @@ export type TranspileContext = {
 	basePath?: string;
 	mode?: Mode;
 	cache: Map<string, string[]>;
+	output: string[];
+	sources: SourceFile[];
 };
 
 let handlers: Record<number, (node: ts.Node, ctx: TranspileContext) => string> = {};
@@ -61,7 +64,7 @@ export function createAnonFunction(body: string, params: string) {
 }
 
 export function handleNode(node: ts.Node, ctx: TranspileContext) {
-
+	// console.log(ts.SyntaxKind[node.kind], node.getText())
 	try {
 		const handler = handlers[node.kind];
 		if (handler) {
@@ -86,7 +89,9 @@ export function transpileProgram(entryFileRelativePath: string) {
 		currentFolder: process.cwd(),
 		currentFilePath: path.resolve(process.cwd(), entryFileRelativePath),
 		namedImports: {},
-		cache: new Map()
+		cache: new Map(),
+		sources: [],
+		output: [],
 	};
 
 	if (!fs.existsSync(ctx.currentFilePath)) {
@@ -94,21 +99,30 @@ export function transpileProgram(entryFileRelativePath: string) {
 		process.exit(1);
 	}
 
-	const start = Date.now()
+	const start = Date.now();
+
+	const tsconfigPath = findProjectRoot(process.cwd(), "tsconfig.json") + "/tsconfig.json";
+	const res = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+	const parsed = ts.parseJsonConfigFileContent(res.config, ts.sys, path.dirname(tsconfigPath));
+	// console.log(parsed)
 
 	program = ts.createProgram({
-		rootNames: [ctx.currentFilePath],
-		options: {
-			target: ts.ScriptTarget.Latest,
-			noLib: true,
-			types: ["@grey-ts/types"]
-		},
+		rootNames: parsed.fileNames,
+		options: parsed.options,
+		// rootNames: [ctx.currentFilePath],
+		// options: {
+		// 	target: ts.ScriptTarget.Latest,
+		// 	noLib: true,
+		// 	types: ["@grey-ts/types"],
+		// 	verbatimModuleSyntax: true,
+		// },
 	});
+
 
 	checker = program.getTypeChecker();
 	handlers = createHandlers();
 
-	const sources = program.getSourceFiles().filter(source => {
+	ctx.sources = program.getSourceFiles().filter(source => {
 		if (source.isDeclarationFile)
 			return false;
 		if (program.isSourceFileDefaultLibrary(source))
@@ -118,37 +132,56 @@ export function transpileProgram(entryFileRelativePath: string) {
 		return true;
 	});
 
-	const output: string[] = [];
-	for (const source of sources) {
-		console.log(`Transpiling ${path.basename(source.fileName)}`);
-		ctx.currentFilePath = source.fileName;
-		ctx.currentFolder = path.dirname(source.fileName);
-		ctx.namedImports = {};
-
-		// Todo: Maybe use worker threads if it takes too long to transpile
-		const result = transpileSourceFile(source, ctx);
-		output.push(result);
+	const entry = ctx.sources.find(s => s.fileName === ctx.currentFilePath);
+	if (!entry) {
+		console.error(`Error: failed to find '${ctx.currentFilePath}' from the included sources`);
+		process.exit(1);
 	}
 
+	// Todo: Maybe use worker threads if it takes too long to transpile
+	transpileSourceFile(entry, ctx);
+
+	// const output: string[] = [];
+	// for (const source of sources) {
+	// 	const result = transpileSourceFile(source, ctx);
+	// 	output.push(result);
+	// }
+
 	if (utilFunctions.size) {
-		output.unshift(...Array.from(utilFunctions.values()));
+		ctx.output.unshift(...Array.from(utilFunctions.values()));
 		utilFunctions.clear();
 	}
 
 	console.log(`Transpiling took ${Date.now() - start} ms`);
 
-	return output.join("\n");
+	return ctx.output.join("\n");
 }
 
-export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext): string {
+export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext) {
+	if (ctx.cache.has(sourceFile.fileName))
+		return "";
+
 	const output: string[] = [];
+	ctx.cache.set(sourceFile.fileName, output);
+
+	const prevFile = ctx.currentFilePath;
+
+	ctx.currentFilePath = sourceFile.fileName;
+	ctx.currentFolder = path.dirname(sourceFile.fileName);
+	ctx.namedImports = {};
 
 	sourceFile.forEachChild((node) => {
 		const result = handleNode(node, ctx);
 		if (result) output.push(result);
 	});
 
-	ctx.cache.set(ctx.currentFilePath, output);
-	return output.join("\n");
+	ctx.currentFilePath = prevFile;
+	ctx.currentFolder = path.dirname(prevFile);
+
+	console.log(`Transpiled ${path.basename(sourceFile.fileName)}`);
+	const result = output.join("\n");
+	ctx.output.push(result);
+
+	return "";
 }
 

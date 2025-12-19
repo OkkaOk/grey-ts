@@ -2,7 +2,7 @@ import ts from "typescript";
 import { handleNode, type TranspileContext } from "../transpiler";
 
 function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration>; }, ctx: TranspileContext) {
-	const params = node.parameters.map(param => handleNode(param.name, ctx)).join(", ");
+	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
 	const body = node.body ? handleBlock(node.body, ctx) : "";
 
 	return `function(${params})\n\t${body}\nend function`;
@@ -13,7 +13,7 @@ function handleBlock(node: ts.Block, ctx: TranspileContext): string {
 }
 
 function handleConstructor(node: ts.ConstructorDeclaration, ctx: TranspileContext): string {
-	const params = node.parameters.map(param => handleNode(param.name, ctx)).join(", ");
+	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
 	const body = node.body ? handleBlock(node.body, ctx) : "";
 
 	return `constructor = function(${params})\n\t${body}\nreturn self\nend function`;
@@ -39,7 +39,7 @@ function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): str
 		throw new Error("Inline anonymous arrow functions are not supported yet.");
 	}
 
-	const params = node.parameters.map(param => handleNode(param.name, ctx)).join(", ");
+	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
 	const body = ts.isBlock(node.body) ? handleNode(node.body, ctx) : `return ${handleNode(node.body, ctx)}`;
 
 	return `function(${params})\n\t${body}\nend function`;

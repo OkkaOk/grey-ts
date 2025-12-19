@@ -1,7 +1,6 @@
 import ts from "typescript";
-import { apiNameMap } from "../replaceKeywords";
 import { checker, handleNode, utilFunctions, type TranspileContext } from "../transpiler";
-import { asRef, nodeIsFunction } from "../utils";
+import { asRef, nodeIsFunction, replaceIdentifier } from "../utils";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: TranspileContext): string {
 	const left = handleNode(node.expression, ctx);
@@ -9,9 +8,9 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 
 	const leftType = checker.getTypeAtLocation(node.expression);
 	const symbol = leftType.getProperty(node.name.text);
-	const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
 
-	const right = apiNameMap[symbolFullName] ?? node.name.text;
+	// console.log(node.name.text, symbol);
+	const right = replaceIdentifier(handleNode(node.name, ctx), symbol);
 	const isFunction = nodeIsFunction(node.name);
 	// console.log(ts.SyntaxKind[node.kind], node.getText(), symbolFullName, right, isFunction);
 
@@ -31,8 +30,6 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 		return "list";
 	else if (output === "Function.prototype")
 		return "funcRef";
-
-
 
 	return isFunction ? asRef(output) : output;
 }
@@ -58,19 +55,32 @@ function handleCallExpression(node: ts.CallExpression, ctx: TranspileContext): s
 	ctx.inFunctionCall = true;
 	const args = node.arguments.map(arg => handleNode(arg, ctx));
 	ctx.inFunctionCall = false;
+	
+	let name = handleNode(node.expression, ctx);
+	if (name && name[0] === "@") name = name.slice(1); // Don't need it in call expression
+	
+	const symbol = checker.getSymbolAtLocation(node.expression);
+	const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
+
+	// TODO: more modular system than this and the Object.assign above
+	if (symbolFullName === "Array.concat") {
+		const dotI = name.lastIndexOf(".");
+		args.unshift(name.slice(0, dotI));
+		return args.join(" + ");
+	}
 
 	const type = checker.getTypeAtLocation(node.expression);
 	const callParams = type.getCallSignatures()[0]?.parameters || [];
+	// console.log(ts.SyntaxKind[node.expression.kind], node.expression.getText(), callParams.length, checker.getSymbolAtLocation(node.expression))
 	modifyArgs(args, callParams);
 
-	const name = handleNode(node.expression, ctx);
 	if (name === "is_type" && !utilFunctions.has("is_type")) {
-		utilFunctions.set("is_type", "is_type = function(value, type)\nif typeof(value) == type then return true\nreturn false\nend function");
+		utilFunctions.set("is_type", "is_type = function(value, type)\nif typeof(value) == type then return 1\nreturn 0\nend function");
 	}
 	else if (name === "Object.assign") {
 		return `(${args.join(" + ")})`;
 	}
-
+	
 	return `${name}(${args.join(", ")})`;
 }
 
@@ -89,6 +99,21 @@ function handleNewExpression(node: ts.NewExpression, ctx: TranspileContext): str
 
 function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext): string {
 	let operatorToken = ts.tokenToString(node.operatorToken.kind) || node.operatorToken.getText();
+
+	if (ts.isPropertyAccessExpression(node.left)) {
+		const leftType = checker.getTypeAtLocation(node.left.expression);
+		const symbol = leftType.getProperty(node.left.name.text);
+		
+		if (symbol?.declarations && ts.isSetAccessor(symbol.declarations[0]!)) {
+			if (operatorToken != "=") {
+				// TODO: make this work with others
+				throw new Error("Set accessor can only work with = operator for now.");
+			}
+
+			return `${handleNode(node.left.expression, ctx)}.${node.left.name.text}(${handleNode(node.right, ctx)})`;
+		}
+	}
+
 	if (operatorToken == "+=" || operatorToken == "-=")
 		return `${handleNode(node.left, ctx)} = ${handleNode(node.left, ctx)} ${operatorToken[0]} ${handleNode(node.right, ctx)}`;
 
@@ -142,9 +167,8 @@ function handleElementAccessExpression(node: ts.ElementAccessExpression, ctx: Tr
 	if (ts.isStringLiteral(node.argumentExpression)) {
 		const leftType = checker.getTypeAtLocation(node.expression);
 		const symbol = leftType.getProperty(node.argumentExpression.text);
-		const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
 
-		right = `"${apiNameMap[symbolFullName] ?? node.argumentExpression.text}"`;
+		right = `"${replaceIdentifier(node.argumentExpression.text, symbol)}"`;
 	}
 	else {
 		right = handleNode(node.argumentExpression, ctx);
@@ -164,7 +188,6 @@ function handleTemplateExpression(node: ts.TemplateExpression, ctx: TranspileCon
 	];
 	const output = strings.join(" + ");
 
-	// TODO: CHECK
 	return output;
 }
 

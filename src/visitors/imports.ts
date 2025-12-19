@@ -1,5 +1,6 @@
+import path from "node:path";
 import ts from "typescript";
-import { type TranspileContext } from "../transpiler";
+import { transpileSourceFile, type TranspileContext } from "../transpiler";
 
 function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileContext): string {
 	// console.log(node);
@@ -17,9 +18,17 @@ function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileConte
 	// if (namedImports && ts.isNamedImports(namedImports))
 	// 	console.log(namedImports.elements);
 
-	// const moduleSpecifier = (node.moduleSpecifier as ts.StringLiteral).text;
-	// return transpileModule(moduleSpecifier, ctx);
-	return "";
+	const moduleSpecifier = (node.moduleSpecifier as ts.StringLiteral).text;
+	let srcPath = path.resolve(ctx.currentFolder, moduleSpecifier);
+	if (!path.extname(srcPath)) srcPath += ".ts";
+	
+	const source = ctx.sources.find(s => s.fileName === srcPath);
+	if (!source) {
+		console.error(`Failed to find source ${srcPath}`);
+		return ""
+	}
+
+	return transpileSourceFile(source, ctx);
 }
 
 function createImportHandlers() {

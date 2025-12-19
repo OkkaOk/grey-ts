@@ -12,7 +12,7 @@ function handleVariableDeclaration(
 	}
 
 	let left = handleNode(node.name, ctx);
-	if (nodeIsFunction(node))
+	if (nodeIsFunction(node.name))
 		left = asRef(left);
 
 	return `${left} = ${right}`;

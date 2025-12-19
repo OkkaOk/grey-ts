@@ -28,16 +28,16 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "bun run scripts/build.ts"
+		"build": "bun run scripts/build.ts",
+		"transpile": "bun run src/index.ts transpile"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"
 	},
 	"peerDependencies": {
-		"typescript": "^5",
-		"@grey-ts/types": "https://github.com/OkkaOk/grey-ts-types"
+		"typescript": "^5"
 	},
 	"dependencies": {
-		"greybel-js": "^3.7.10"
+		"@grey-ts/types": "link:@grey-ts/types"
 	}
 }
