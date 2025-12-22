@@ -11,9 +11,7 @@ function handleClassDeclaration(node: ts.ClassDeclaration, ctx: TranspileContext
 
 	for (const member of node.members) {
 		if (ts.isMethodDeclaration(member)) {
-			const methodName = handleNode(member.name!, ctx);
-			// console.log(member)
-			output += `\n${name}.${methodName} = ${handleNode(member, ctx)}`;
+			output += `\n${name}.${handleNode(member, ctx)}`;
 		} else if (ts.isPropertyDeclaration(member)) {
 			output += `\n${name}.${handleNode(member, ctx)}`;
 		} else {

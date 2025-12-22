@@ -1,11 +1,12 @@
 {
 	"compilerOptions": {
+		"outDir": "dist",
 		// Environment setup & latest features
 		"lib": [
 			"ESNext"
 		],
 		"target": "esnext",
-		"module": "esnext",
+		"module": "preserve",
 		"moduleDetection": "force",
 		"allowJs": true,
 		"typeRoots": [
@@ -15,9 +16,9 @@
 
 		// Bundler mode
 		"moduleResolution": "bundler",
-		"allowImportingTsExtensions": true,
+		"allowImportingTsExtensions": false,
 		"verbatimModuleSyntax": true,
-		"noEmit": true,
+		"noEmit": false,
 
 		// Best practices
 		"strict": true,
@@ -30,5 +31,6 @@
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
 		"noPropertyAccessFromIndexSignature": false
-	}
+	},
+	// "include": ["src"]
 }

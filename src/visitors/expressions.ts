@@ -1,6 +1,7 @@
+import path from "node:path";
 import ts from "typescript";
-import { checker, handleNode, utilFunctions, type TranspileContext } from "../transpiler";
-import { asRef, nodeIsFunction, replaceIdentifier } from "../utils";
+import { calledUtilFunctions, checker, handleNode, transpileSourceFile, type TranspileContext } from "../transpiler";
+import { asRef, callUtilFunction, getSourceFiles, nodeIsFunction, replaceIdentifier } from "../utils";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: TranspileContext): string {
 	const left = handleNode(node.expression, ctx);
@@ -10,14 +11,37 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 	const symbol = leftType.getProperty(node.name.text);
 
 	// console.log(node.name.text, symbol);
-	const right = replaceIdentifier(handleNode(node.name, ctx), symbol);
+	let right = replaceIdentifier(handleNode(node.name, ctx), symbol);
+	if (right[0] === "@") right = right.slice(1);
+
 	const isFunction = nodeIsFunction(node.name);
 	// console.log(ts.SyntaxKind[node.kind], node.getText(), symbolFullName, right, isFunction);
+
+	// TODO: Remove @ from getters. Or just improve the system
 
 	// We've imported something like this: import * as lib from "mylib"
 	// Next when we use lib.func() we omit the lib. so it becomes func()
 	if (ctx.namedImports[left])
 		return isFunction ? asRef(right) : right;
+
+	// if (node.questionDotToken) {
+
+	// }
+
+	let getSafely = !!node.questionDotToken;
+
+	const rightType = checker.getTypeAtLocation(node.name);
+	if (!ctx.isAssignment && rightType.isUnion()) {
+		// TODO: situation if right side is a function call.
+
+		const hasUndefined = rightType.types.some(t => t.flags === ts.TypeFlags.Undefined);
+		if (hasUndefined) getSafely = true;
+	}
+
+	if (getSafely)
+		return callUtilFunction("get_property", left, `"${right}"`);
+
+	// console.log(node.name.text, checker.getTypeAtLocation(node.name))
 
 	const output = `${left}.${right}`;
 	if (output === "String.prototype")
@@ -32,6 +56,27 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 		return "funcRef";
 
 	return isFunction ? asRef(output) : output;
+}
+
+function handleElementAccessExpression(node: ts.ElementAccessExpression, ctx: TranspileContext): string {
+	const left = handleNode(node.expression, ctx);
+	let right: string;
+
+	if (ts.isStringLiteral(node.argumentExpression)) {
+		const leftType = checker.getTypeAtLocation(node.expression);
+		const symbol = leftType.getProperty(node.argumentExpression.text);
+
+		right = `"${replaceIdentifier(node.argumentExpression.text, symbol)}"`;
+	}
+	else {
+		right = handleNode(node.argumentExpression, ctx);
+	}
+
+	if (!ctx.isAssignment) {
+		return callUtilFunction("get_property", left, `${right}`);
+	}
+
+	return `${left}[${right}]`;
 }
 
 /** Modifies the args to fit if there are rest parameters so it puts them in an array. */
@@ -55,32 +100,57 @@ function handleCallExpression(node: ts.CallExpression, ctx: TranspileContext): s
 	ctx.inFunctionCall = true;
 	const args = node.arguments.map(arg => handleNode(arg, ctx));
 	ctx.inFunctionCall = false;
-	
+
 	let name = handleNode(node.expression, ctx);
 	if (name && name[0] === "@") name = name.slice(1); // Don't need it in call expression
-	
-	const symbol = checker.getSymbolAtLocation(node.expression);
-	const symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
 
-	// TODO: more modular system than this and the Object.assign above
+	const type = checker.getTypeAtLocation(node.expression);
+	const symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
+
+	// TODO: more modular system than this...
 	if (symbolFullName === "Array.concat") {
 		const dotI = name.lastIndexOf(".");
 		args.unshift(name.slice(0, dotI));
 		return args.join(" + ");
 	}
 
-	const type = checker.getTypeAtLocation(node.expression);
+	if (symbolFullName === "GreyHack.include") {
+		if (!node.arguments.length) return "";
+		if (args[0]!.charAt(0) === "\"") {
+			args[0] = args[0]!.slice(1, -1);
+		}
+
+		const absPath = path.resolve(ctx.currentFolder, args[0]!);
+		const sources = getSourceFiles(absPath);
+
+		for (const source of sources) {
+			transpileSourceFile(source, ctx);
+		}
+
+		return "";
+	}
+
+	if (symbolFullName === "ObjectConstructor.hasOwn") {
+		if (args.length < 2) throw "Invalid argument count";
+
+		return `${args[0]}.hasIndex(${args[1]})`;
+	}
+	else if (symbolFullName === "ObjectConstructor.assign") {
+		if (args.length < 2) throw "Invalid argument count";
+		return callUtilFunction("assign_objects", args[0]!, `[${args.slice(1).join(",")}]`);
+	}
+	else if (symbolFullName === "ObjectConstructor.keys") {
+		return `${[args[0]]}.indexes()`;
+	}
+
 	const callParams = type.getCallSignatures()[0]?.parameters || [];
-	// console.log(ts.SyntaxKind[node.expression.kind], node.expression.getText(), callParams.length, checker.getSymbolAtLocation(node.expression))
+	// console.log(ts.SyntaxKind[node.expression.kind], node.expression.getText(), callParams.length, symbolFullName)
 	modifyArgs(args, callParams);
 
-	if (name === "is_type" && !utilFunctions.has("is_type")) {
-		utilFunctions.set("is_type", "is_type = function(value, type)\nif typeof(value) == type then return 1\nreturn 0\nend function");
+	if (name === "is_type" && !calledUtilFunctions.get("is_type")) {
+		calledUtilFunctions.set("is_type", true);
 	}
-	else if (name === "Object.assign") {
-		return `(${args.join(" + ")})`;
-	}
-	
+
 	return `${name}(${args.join(", ")})`;
 }
 
@@ -97,25 +167,73 @@ function handleNewExpression(node: ts.NewExpression, ctx: TranspileContext): str
 	return output;
 }
 
+const knownOperators: Record<string, boolean> = {
+	"=": true,
+	"+": true,
+	"+=": true,
+	"-": true,
+	"-=": true,
+	"++": true,
+	"--": true,
+	"**": true,
+	"&&": true,
+	"==": true,
+	"===": true,
+	"!=": true,
+	"!==": true,
+	"??": true,
+	"??=": true,
+	"in": true,
+	"||": true,
+	"<": true,
+	"<=": true,
+	">": true,
+	">=": true,
+	"*": true,
+	"/": true,
+	"%": true,
+};
+
 function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext): string {
 	let operatorToken = ts.tokenToString(node.operatorToken.kind) || node.operatorToken.getText();
+	if (!knownOperators[operatorToken])
+		throw `Can't handle operator '${operatorToken}' yet`;
+
+	const right = handleNode(node.right, ctx);
 
 	if (ts.isPropertyAccessExpression(node.left)) {
 		const leftType = checker.getTypeAtLocation(node.left.expression);
 		const symbol = leftType.getProperty(node.left.name.text);
-		
+
 		if (symbol?.declarations && ts.isSetAccessor(symbol.declarations[0]!)) {
 			if (operatorToken != "=") {
 				// TODO: make this work with others
-				throw new Error("Set accessor can only work with = operator for now.");
+				throw "Set accessor can only work with = operator for now.";
 			}
 
-			return `${handleNode(node.left.expression, ctx)}.${node.left.name.text}(${handleNode(node.right, ctx)})`;
+			return `${handleNode(node.left.expression, ctx)}.${node.left.name.text}(${right})`;
 		}
 	}
 
+	if (operatorToken === "??") {
+		const left = handleNode(node.left, ctx);
+		return callUtilFunction("nullish_coalescing_op", left, right);
+	}
+	else if (operatorToken === "??=") {
+		const left = handleNode(node.left, ctx);
+		return `${left} = ${callUtilFunction("nullish_coalescing_op", left, right)}`;
+	}
+	else if (operatorToken === "in") {
+		return `${right}.hasIndex(${handleNode(node.left, ctx)})`;
+	}
+
+	if (operatorToken === "=") ctx.isAssignment = true;
+	const left = handleNode(node.left, ctx);
+	if (operatorToken === "=") ctx.isAssignment = false;
+
+	// console.log(checker.getTypeAtLocation(node.right).flags, ts.TypeFlags.Undefined)
 	if (operatorToken == "+=" || operatorToken == "-=")
-		return `${handleNode(node.left, ctx)} = ${handleNode(node.left, ctx)} ${operatorToken[0]} ${handleNode(node.right, ctx)}`;
+		return `${left} = ${left} ${operatorToken[0]} ${right}`;
 
 	if (operatorToken == "**") operatorToken = "^";
 	else if (operatorToken == "||") operatorToken = "or";
@@ -123,7 +241,7 @@ function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext
 	else if (operatorToken == "===") operatorToken = "==";
 	else if (operatorToken == "!==") operatorToken = "!=";
 
-	return `${handleNode(node.left, ctx)} ${operatorToken} ${handleNode(node.right, ctx)}`;
+	return `${left} ${operatorToken} ${right}`;
 }
 
 function handleParenthesizedExpression(node: ts.ParenthesizedExpression, ctx: TranspileContext): string {
@@ -149,32 +267,158 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 	if (operator == "+")
 		return `${operand}.val()`;
 
-	throw new Error(`Couldn't handle this UnaryExpression: ${node.getText()}`);
+	throw `Couldn't handle this UnaryExpression: ${node.getText()}`;
 }
 
-function handleArrayLiteralExpression(node: ts.ArrayLiteralExpression, ctx: TranspileContext): string {
-	return `[${node.elements.map(item => handleNode(item, ctx)).join(",")}]`;
-}
+function handleSpreadElement(node: ts.SpreadElement, ctx: TranspileContext): string {
+	// Here the parent can't be ArrayLiteralExpression anymore as I handle this node there
+	// So the parent can only be either ts.CallExpression or ts.NewExpression
+	if (ts.isArrayLiteralExpression(node.parent))
+		throw new Error("SpreadElement's parent was ArrayLiteralExpression which shouldn't have been possible");
 
-function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: TranspileContext): string {
-	const res = `{${node.properties.map(item => handleNode(item, ctx)).join(",")}}`;
-	return res;
-}
+	if (ts.isArrayLiteralExpression(node.expression)) {
+		const items: string[] = [];
+		const out: string[] = [];
+		handleArrayLiteralExpression(node.expression, ctx, items, out);
 
-function handleElementAccessExpression(node: ts.ElementAccessExpression, ctx: TranspileContext): string {
-	let right: string;
+		// TODO: do something smarter...
+		if (out.length > 1)
+			throw "The transpiler can't handle it yet if there are nested spread elements as parameters";
 
-	if (ts.isStringLiteral(node.argumentExpression)) {
-		const leftType = checker.getTypeAtLocation(node.expression);
-		const symbol = leftType.getProperty(node.argumentExpression.text);
-
-		right = `"${replaceIdentifier(node.argumentExpression.text, symbol)}"`;
-	}
-	else {
-		right = handleNode(node.argumentExpression, ctx);
+		return items.join(", ");
+		// return node.expression.elements.map(item => handleNode(item, ctx)).join(", ");
 	}
 
-	return `${handleNode(node.expression, ctx)}[${right}]`;
+	const callType = checker.getTypeAtLocation(node.parent.expression);
+	const params = (callType.getCallSignatures()[0] ?? callType.getConstructSignatures()[0])?.parameters ?? [];
+	const missingParamCount = params.length - (node.parent.arguments?.length ?? 0) + 1;
+
+	const spreadCount = node.parent.arguments?.map(p => ts.isSpreadElement(p) ? 1 : 0).reduce<number>((acc, curr) => acc + curr, 0) ?? 1;
+
+	// TODO: This spaghetti doesn't work if there are more than 1 spread element in the parameters so let's throw
+	if (spreadCount > 1)
+		throw "The transpiler can't currently handle it if there are more than 1 spread operator as a parameter";
+
+	const name = handleNode(node.expression, ctx);
+	return new Array(missingParamCount).fill(0).map((_, i) => `${name}[${i}]`).join(", ");
+}
+
+export function handleArrayLiteralExpression(node: ts.ArrayLiteralExpression, ctx: TranspileContext, itemStrings?: string[], out?: string[]): string {
+	itemStrings ??= [];
+	out ??= [];
+
+	for (const item of node.elements) {
+		if (!ts.isSpreadElement(item)) {
+			itemStrings.push(handleNode(item, ctx));
+			continue;
+		}
+
+		if (ts.isArrayLiteralExpression(item.expression)) {
+			handleArrayLiteralExpression(item.expression, ctx, itemStrings, out);
+			continue;
+		}
+
+		// const type = checker.getTypeAtLocation(item.expression);
+		// const resolvedTypes = ("resolvedTypeArguments" in type) ? type.resolvedTypeArguments as ts.Type[] : [];
+		// if (resolvedTypes.length && resolvedTypes.every(t => t.isLiteral())) {
+		// 	for (const resolved of resolvedTypes) {
+		// 		itemStrings.push(resolved.value.toString())
+		// 	}
+		// 	continue;
+		// }
+
+		if (itemStrings.length) {
+			out.push(`[${itemStrings.join(",")}]`);
+			itemStrings.length = 0;
+		}
+
+		out.push(handleNode(item.expression, ctx));
+	}
+
+	if (out.length && itemStrings.length) {
+		out.push(`[${itemStrings.join(",")}]`);
+		itemStrings.length = 0;
+	} else if (!out.length) {
+		out.push(`[${itemStrings.join(",")}]`);
+		itemStrings.length = 0;
+	}
+
+	return out.join(" + ");
+}
+
+function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: TranspileContext, currObj?: string[], outObjects?: string[], funcs?: string[]): string {
+	currObj ??= [];
+	outObjects ??= [];
+	funcs ??= [];
+
+	const objectName = ts.isVariableDeclaration(node.parent) ? handleNode(node.parent.name, ctx) : "";
+
+	function pushObj() {
+		if (!currObj?.length)
+			return "";
+
+		const res = currObj.filter(s => s != "").join(",");
+		if (res) {
+			outObjects?.push(`{ ${res} }`);
+		}
+
+		currObj.length = 0;
+		return res;
+	}
+
+	for (const item of node.properties) {
+		if (ts.isFunctionLike(item)) {
+			if (!objectName)
+				throw "You can't have method declarations inside an object that is not being assigned to a variable";
+
+			funcs.push(`${objectName}.${handleNode(item, ctx)}`);
+			continue;
+		}
+
+		if (ts.isPropertyAssignment(item) && ts.isFunctionExpression(item.initializer)) {
+			if (!objectName)
+				throw "You can't have method declarations inside an object that is not being assigned to a variable";
+			funcs.push(`${objectName}.${handleNode(item.name, ctx)} = ${handleNode(item.initializer, ctx)}`);
+			continue;
+		}
+
+		if (ts.isSpreadAssignment(item)) {
+			if (ts.isObjectLiteralExpression(item.expression)) {
+				handleObjectLiteralExpression(item.expression, ctx, currObj, outObjects);
+				continue;
+			}
+
+			if (ts.isIdentifier(item.expression)) {
+				pushObj();
+				outObjects.push(handleNode(item.expression, ctx));
+				continue;
+			}
+
+			if (ts.isArrayLiteralExpression(item.expression)) {
+				pushObj();
+				outObjects.push(handleNode(item.expression, ctx));
+				continue;
+			}
+			// continue;
+		}
+
+		currObj.push(handleNode(item, ctx));
+	}
+
+	pushObj();
+	if (!outObjects.length)
+		outObjects.push("{}");
+
+	let output = outObjects[0]!;
+	if (outObjects.length > 1) {
+		output = callUtilFunction("assign_objects", output, `[${outObjects.slice(1).join(",")}]`);
+	}
+
+	if (funcs.length) {
+		output += "\n" + funcs.join("\n");
+	}
+
+	return output;
 }
 
 // e.g. `Hello ${name}`
@@ -203,7 +447,7 @@ function handleTemplateSpan(node: ts.TemplateSpan, ctx: TranspileContext): strin
 
 function handleConditionalExpression(node: ts.ConditionalExpression, ctx: TranspileContext): string {
 	if (node.parent.kind === ts.SyntaxKind.CallExpression) {
-		throw new Error("Conditional expressions are not supported inside call expressions.");
+		throw "Conditional expressions are not supported inside call expressions.";
 	}
 
 	return `\
@@ -236,14 +480,29 @@ function createExpressionHandlers() {
 		[ts.SyntaxKind.ParenthesizedExpression]: handleParenthesizedExpression,
 		[ts.SyntaxKind.PostfixUnaryExpression]: handleUnaryExpression,
 		[ts.SyntaxKind.PrefixUnaryExpression]: handleUnaryExpression,
+		[ts.SyntaxKind.SpreadElement]: handleSpreadElement,
 		[ts.SyntaxKind.ArrayLiteralExpression]: handleArrayLiteralExpression,
 		[ts.SyntaxKind.ObjectLiteralExpression]: handleObjectLiteralExpression,
 		[ts.SyntaxKind.ElementAccessExpression]: handleElementAccessExpression,
 		[ts.SyntaxKind.TemplateExpression]: handleTemplateExpression,
 		[ts.SyntaxKind.TemplateHead]: handleTemplateHead,
 		[ts.SyntaxKind.TemplateSpan]: handleTemplateSpan,
+		[ts.SyntaxKind.FirstTemplateToken]: (node: ts.Identifier) => `"${node.text}"`,
 		[ts.SyntaxKind.AsExpression]: (node: ts.AsExpression, ctx: TranspileContext) => handleNode(node.expression, ctx),
 		[ts.SyntaxKind.ConditionalExpression]: handleConditionalExpression,
+		[ts.SyntaxKind.DeleteExpression]: (node: ts.DeleteExpression, ctx: TranspileContext) => {
+			if (!ts.isPropertyAccessExpression(node.expression))
+				throw `Cant handle delete expression for ${ts.SyntaxKind[node.expression.kind]}`;
+
+			const pnode = node.expression;
+			const left = handleNode(pnode.expression, ctx);
+
+			const leftType = checker.getTypeAtLocation(pnode.expression);
+			const symbol = leftType.getProperty(pnode.name.text);
+
+			const right = replaceIdentifier(handleNode(pnode.name, ctx), symbol);
+			return `${left}.remove(${right})`;
+		}
 	};
 }
 

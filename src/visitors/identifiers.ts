@@ -5,7 +5,21 @@ import { asRef, nodeIsFunction, replaceIdentifier } from "../utils";
 function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 	const type = checker.getTypeAtLocation(node);
 
-	let name = replaceIdentifier(node.text, type.getSymbol())
+	const original = node.text;
+	let name = node.text;
+
+	if (type.flags === ts.TypeFlags.Undefined)
+		return "null"; // No undefined in greyscript
+
+	if (type.isUnion()) {
+		for (const t of type.types) {
+			name = replaceIdentifier(node.text, t.symbol)
+			if (name != original) break
+		}
+	}
+	else {
+		name = replaceIdentifier(node.text, type.symbol)
+	}
 
 	// Alternatively could check if the parent is a CallExpression or NewExpression
 	if (ctx.inFunctionCall && nodeIsFunction(node)) name = asRef(name);

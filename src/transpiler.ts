@@ -1,4 +1,3 @@
-import { hash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import ts, { type SourceFile } from "typescript";
@@ -23,16 +22,45 @@ export type TranspileContext = {
 	currentFolder: string;
 	namedImports: Record<string, boolean>;
 	inFunctionCall?: boolean;
+	isAssignment?: boolean;
 	basePath?: string;
 	mode?: Mode;
-	cache: Map<string, string[]>;
+	visitedFiles: Record<string, boolean>;
 	output: string[];
 	sources: SourceFile[];
 };
 
 let handlers: Record<number, (node: ts.Node, ctx: TranspileContext) => string> = {};
 
-export const utilFunctions = new Map<string, string>();
+export const calledUtilFunctions = new Map<keyof typeof utilFunctions, boolean>()
+export const utilFunctions = {
+	"get_property": [
+		"get_property = function(obj, key)",
+		"	if not obj then return null",
+		"	if (obj.hasIndex(key)) then return @obj[key]",
+		`	if (obj.hasIndex("__isa")) then return get_property(obj["__isa"], key)`,
+		"	return null",
+		"end function",
+	].join("\n"),
+	"assign_objects": [
+		"assign_objects = function(target, sources)",
+		"	for source in sources",
+		"		if (typeof(source) == \"list\") then",
+		"			for i in range(0, source.len() - 1, 1)",
+		"				target[str(i)] = source[i]",
+		"			end for",
+		"		else if (typeof(source) == \"map\") then",
+		"			for item in source",
+		"				target[item.key] = item.value",
+		"			end for",
+		"		end if",
+		"	end for",
+		"	return target",
+		"end function"
+	].join("\n"),
+	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\nif (left == null) then return @right\nreturn @left\nend function",
+	"is_type": "is_type = function(value, type)\nif typeof(value) == type then return 1\nreturn 0\nend function",
+}
 
 function createHandlers() {
 	const result: typeof handlers = {};
@@ -54,14 +82,14 @@ function createHandlers() {
 	return result;
 }
 
-export function createAnonFunction(body: string, params: string) {
-	const randomName = "func_" + hash("sha1", `${Date.now()} ${Math.random()}`).slice(0, 10);
+// export function createAnonFunction(body: string, params: string) {
+// 	const randomName = "func_" + hash("sha1", `${Date.now()} ${Math.random()}`).slice(0, 10);
 
-	const result = `${randomName} = function(${params})\n${body}\nend function`;
-	utilFunctions.set(randomName, result);
+// 	const result = `${randomName} = function(${params})\n${body}\nend function`;
+// 	utilFunctions.set(randomName, result);
 
-	return { name: randomName, str: result };
-}
+// 	return { name: randomName, str: result };
+// }
 
 export function handleNode(node: ts.Node, ctx: TranspileContext) {
 	// console.log(ts.SyntaxKind[node.kind], node.getText())
@@ -77,19 +105,26 @@ export function handleNode(node: ts.Node, ctx: TranspileContext) {
 		const source = node.getSourceFile();
 		const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
 		console.error(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character}`);
-		return "null";
+		return ts.isSourceFile(node.parent) ? "" : "null";
 	}
 
+	const source = node.getSourceFile();
+	const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
 	console.log(`Unsupported syntax ${ts.SyntaxKind[node.kind]} (kind ${node.kind}) was not transpiled: ${node.getText()}`);
+	console.log(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character}`);
 	return "";
 }
+
+// type TranspileOptions = {
+// 	entryFileRelativePath: string,
+// }
 
 export function transpileProgram(entryFileRelativePath: string) {
 	const ctx: TranspileContext = {
 		currentFolder: process.cwd(),
 		currentFilePath: path.resolve(process.cwd(), entryFileRelativePath),
 		namedImports: {},
-		cache: new Map(),
+		visitedFiles: {},
 		sources: [],
 		output: [],
 	};
@@ -117,7 +152,6 @@ export function transpileProgram(entryFileRelativePath: string) {
 		// 	verbatimModuleSyntax: true,
 		// },
 	});
-
 
 	checker = program.getTypeChecker();
 	handlers = createHandlers();
@@ -147,9 +181,9 @@ export function transpileProgram(entryFileRelativePath: string) {
 	// 	output.push(result);
 	// }
 
-	if (utilFunctions.size) {
-		ctx.output.unshift(...Array.from(utilFunctions.values()));
-		utilFunctions.clear();
+	if (calledUtilFunctions.size) {
+		for (const call of calledUtilFunctions.keys())
+			ctx.output.unshift(utilFunctions[call]);
 	}
 
 	console.log(`Transpiling took ${Date.now() - start} ms`);
@@ -158,11 +192,10 @@ export function transpileProgram(entryFileRelativePath: string) {
 }
 
 export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext) {
-	if (ctx.cache.has(sourceFile.fileName))
+	if (ctx.visitedFiles[sourceFile.fileName])
 		return "";
 
-	const output: string[] = [];
-	ctx.cache.set(sourceFile.fileName, output);
+	ctx.visitedFiles[sourceFile.fileName] = true;
 
 	const prevFile = ctx.currentFilePath;
 
@@ -172,16 +205,13 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 
 	sourceFile.forEachChild((node) => {
 		const result = handleNode(node, ctx);
-		if (result) output.push(result);
+		if (result) ctx.output.push(result);
 	});
 
 	ctx.currentFilePath = prevFile;
 	ctx.currentFolder = path.dirname(prevFile);
 
 	console.log(`Transpiled ${path.basename(sourceFile.fileName)}`);
-	const result = output.join("\n");
-	ctx.output.push(result);
-
 	return "";
 }
 

@@ -3,7 +3,7 @@ import { handleNode, type TranspileContext } from "../transpiler";
 
 function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): string {
 	if (!node.condition || !node.initializer || !node.incrementor) {
-		throw new Error("Can't transpile this type of for loop.");
+		throw "Can't transpile this type of for loop.";
 	}
 	// TODO: Ugh
 	return `\
@@ -19,6 +19,13 @@ function handleForOfStatement(node: ts.ForOfStatement, ctx: TranspileContext): s
 	const objToLoop = handleNode(node.expression, ctx);
 
 	return `for ${varName} in ${objToLoop}\n${handleNode(node.statement, ctx)}\nend for`;
+}
+
+function handleForInStatement(node: ts.ForInStatement, ctx: TranspileContext): string {
+	const varName = handleNode((node.initializer as ts.VariableDeclarationList).declarations[0]!.name, ctx);
+	const objToLoop = handleNode(node.expression, ctx);
+
+	return `for ${varName} in ${objToLoop}.indexes()\n${handleNode(node.statement, ctx)}\nend for`;
 }
 
 function handleIfStatement(node: ts.IfStatement, ctx: TranspileContext): string {
@@ -50,6 +57,7 @@ function createStatementHandlers() {
 	return {
 		[ts.SyntaxKind.ForStatement]: handleForStatement,
 		[ts.SyntaxKind.ForOfStatement]: handleForOfStatement,
+		[ts.SyntaxKind.ForInStatement]: handleForInStatement,
 		[ts.SyntaxKind.IfStatement]: handleIfStatement,
 		[ts.SyntaxKind.ContinueStatement]: (_node: ts.ContinueStatement) => "continue",
 		[ts.SyntaxKind.BreakStatement]: (_node: ts.BreakStatement) => "break",

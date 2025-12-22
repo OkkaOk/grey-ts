@@ -173,9 +173,9 @@ export const apiNameMap: Record<string, [string, string]> = {
 	// string
 	"String.isMatch": ["isMatch", "is_match"],
 	"String.toInt": ["toInt", "to_int"],
-	"String.length": ["length", "len"],
+	"String.length": ["length", "len()"],
 	// Object
-	"Object.size": ["size", "len"],
+	"Object.size": ["size", "len()"],
 	// Array
-	"Array.length": ["length", "len"],
+	"Array.length": ["length", "len()"],
 } as const;

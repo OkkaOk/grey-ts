@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import parseCode from "./parser";
 import { apiNameMap } from "./replaceKeywords";
-import { checker } from "./transpiler";
+import { calledUtilFunctions, checker, program, utilFunctions } from "./transpiler";
 
 export function nodeIsFunction(node: ts.Node) {
 	const type = checker.getTypeAtLocation(node);
@@ -21,13 +22,38 @@ export function asRef(value: string): string {
 	return "@" + value;
 }
 
+export function getSourceFiles(absPath: string): ts.SourceFile[] {
+	if (!fs.existsSync(absPath))
+		throw new Error(`File ${absPath} doesn't exist`);
+
+	const output: ts.SourceFile[] = [];
+
+	const filePaths = [absPath];
+	
+	while (filePaths.length) {
+		const file = filePaths.shift()!;
+		
+		const stat = fs.statSync(file);
+		if (stat.isDirectory()) {
+			filePaths.push(...fs.readdirSync(absPath).map(name => path.join(absPath, name)))
+			continue;
+		}
+
+		const existing = program.getSourceFile(file);
+		if (existing) {
+			output.push(existing);
+			continue;
+		}
+
+		const source = parseCode(file, fs.readFileSync(file, { encoding: "utf-8" }));
+		output.push(source);
+	}
+	
+	return output;
+}
+
 export function replaceIdentifier(defaultValue: string, symbol?: ts.Symbol): string {
 	if (!symbol) return defaultValue;
-
-	// TODO: fix a problem if type is an union and they both have a same property
-	// For example in union string | string [] - both have length property so the length identifier
-	// wont be replaced with greyhacks .len() property. The problem is that for unions the getFullyQualifiedName
-	// just returns the identifier, "length" in this case, and we wanted either "String.length" or "Array.length"
 
 	const symbolFullName = checker.getFullyQualifiedName(symbol);
 
@@ -46,4 +72,9 @@ export function findProjectRoot(dir: string, fileToSearch = "package.json"): str
 		dir = parent;
 	}
 	return dir;
+}
+
+export function callUtilFunction(functionName: keyof typeof utilFunctions, ...params: string[]) {
+	calledUtilFunctions.set(functionName, true);
+	return `${functionName}(${params.join(", ")})`;
 }

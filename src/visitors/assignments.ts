@@ -4,9 +4,9 @@ import { asRef, nodeIsFunction } from "../utils";
 
 function handlePropertyAssignment(node: ts.PropertyAssignment, ctx: TranspileContext): string {
 	let right = handleNode(node.initializer, ctx);
-	if (nodeIsFunction(node.initializer)) 
+	if (nodeIsFunction(node.initializer))
 		right = asRef(right);
-	
+
 	if (ts.isNumericLiteral(node.name) || ts.isStringLiteral(node.name) || ts.isComputedPropertyName(node.name))
 		return `${handleNode(node.name, ctx)}: ${right}`;
 
@@ -22,22 +22,13 @@ function handleComputedPropertyName(node: ts.ComputedPropertyName, ctx: Transpil
 	return handleNode(node.expression, ctx);
 }
 
-// function handleSpreadElement(node: ts.SpreadElement): string {
-// 	return handleNode(node.expression);
-// }
 
-// function handleSpreadAssignment(node: ts.SpreadAssignment): string {
-// 	// console.log(node);
-// 	return handleNode(node.expression);
-// }
 
 function createAssignmentHandlers() {
 	return {
 		[ts.SyntaxKind.PropertyAssignment]: handlePropertyAssignment,
 		[ts.SyntaxKind.ShorthandPropertyAssignment]: handleShorthandPropertyAssignment,
 		[ts.SyntaxKind.ComputedPropertyName]: handleComputedPropertyName,
-		// [ts.SyntaxKind.SpreadElement]: handleSpreadElement,
-		// [ts.SyntaxKind.SpreadAssignment]: handleSpreadAssignment,
 	};
 }
 

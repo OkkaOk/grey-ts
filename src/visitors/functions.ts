@@ -19,8 +19,13 @@ function handleConstructor(node: ts.ConstructorDeclaration, ctx: TranspileContex
 	return `constructor = function(${params})\n\t${body}\nreturn self\nend function`;
 }
 
+// Methods inside classes and objects
 function handleMethodDeclaration(node: ts.MethodDeclaration, ctx: TranspileContext): string {
-	return transpileFunctionBody(node, ctx);
+	// if (ts.isObjectLiteralExpression(node.parent)) {
+
+	// }
+	// console.log(`P: ${ts.SyntaxKind[node.parent.kind]}`, node.name.getText())
+	return `${handleNode(node.name, ctx)} = ${transpileFunctionBody(node, ctx)}`;
 }
 
 function handleFunctionDeclaration(node: ts.FunctionDeclaration, ctx: TranspileContext): string {
@@ -33,10 +38,10 @@ function handleFunctionDeclaration(node: ts.FunctionDeclaration, ctx: TranspileC
 
 function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): string {
 	// if (ts.isBinaryExpression(node.parent) && !Object.is(node.parent.right, node)) {
-	// 	throw new Error("Inline arrow functions are not supported.");
+	// 	throw "Inline arrow functions are not supported.";
 	// }
 	if (!ts.isVariableDeclaration(node.parent) && !ts.isBinaryExpression(node.parent)) {
-		throw new Error("Inline anonymous arrow functions are not supported yet.");
+		throw "Inline anonymous arrow functions are not supported yet.";
 	}
 
 	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
