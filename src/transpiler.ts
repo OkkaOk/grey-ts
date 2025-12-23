@@ -20,7 +20,7 @@ type Mode = "ts" | "js";
 export type TranspileContext = {
 	currentFilePath: string;
 	currentFolder: string;
-	namedImports: Record<string, boolean>;
+	namedImports: Record<string, Record<string, boolean>>;
 	inFunctionCall?: boolean;
 	isAssignment?: boolean;
 	basePath?: string;
@@ -32,6 +32,7 @@ export type TranspileContext = {
 
 let handlers: Record<number, (node: ts.Node, ctx: TranspileContext) => string> = {};
 
+const anonFunctions = new Map<string, string>()
 export const calledUtilFunctions = new Map<keyof typeof utilFunctions, boolean>()
 export const utilFunctions = {
 	"get_property": [
@@ -58,8 +59,61 @@ export const utilFunctions = {
 		"	return target",
 		"end function"
 	].join("\n"),
+	"array_map": [
+		"array_map = function(array, callback)",
+		"	index = 0",
+		"	out = []",
+		"	for item in array",
+		"		out.push(callback(item, index, array))",
+		"		index = index + 1",
+		"	end for",
+		"	return out",
+		"end function",
+	].join("\n"),
+	"array_filter": [
+		"array_filter = function(array, predicate)",
+		"	index = 0",
+		"	out = []",
+		"	for item in array",
+		"		if (predicate(item, index, array)) then out.push(item)",
+		"		index = index + 1",
+		"	end for",
+		"	return out",
+		"end function",
+	].join("\n"),
+	"array_find": [
+		"array_find = function(array, predicate)",
+		"	index = 0",
+		"	for item in array",
+		"		if (predicate(item, index, array)) then return item",
+		"		index = index + 1",
+		"	end for",
+		"	return null",
+		"end function",
+	].join("\n"),
+	"array_some": [
+		"array_some = function(array, predicate)",
+		"	index = 0",
+		"	for item in array",
+		"		if (predicate(item, index, array)) then return 1",
+		"		index = index + 1",
+		"	end for",
+		"	return 0",
+		"end function",
+	].join("\n"),
+	"array_every": [
+		"array_every = function(array, predicate)",
+		"	index = 0",
+		"	for item in array",
+		"		if (not predicate(item, index, array)) then return 0",
+		"		index = index + 1",
+		"	end for",
+		"	return 1",
+		"end function",
+	].join("\n"),
 	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\nif (left == null) then return @right\nreturn @left\nend function",
 	"is_type": "is_type = function(value, type)\nif typeof(value) == type then return 1\nreturn 0\nend function",
+	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\nif cond then return when_true\nreturn when_false\nend function",
 }
 
 function createHandlers() {
@@ -82,14 +136,17 @@ function createHandlers() {
 	return result;
 }
 
-// export function createAnonFunction(body: string, params: string) {
-// 	const randomName = "func_" + hash("sha1", `${Date.now()} ${Math.random()}`).slice(0, 10);
+export function createAnonFunction(body: string, params: string[]) {
+	const defaultParams = new Array(3).fill(0).map((_, i) => `param${i}`);
 
-// 	const result = `${randomName} = function(${params})\n${body}\nend function`;
-// 	utilFunctions.set(randomName, result);
+	const nextName = `func_${anonFunctions.size}`;
+	const paramString = Object.assign(defaultParams, params).join(",");
 
-// 	return { name: randomName, str: result };
-// }
+	const result = `${nextName} = function(${paramString})\n${body}\nend function`;
+	anonFunctions.set(nextName, result);
+
+	return { name: nextName, str: result };
+}
 
 export function handleNode(node: ts.Node, ctx: TranspileContext) {
 	// console.log(ts.SyntaxKind[node.kind], node.getText())
@@ -104,14 +161,14 @@ export function handleNode(node: ts.Node, ctx: TranspileContext) {
 
 		const source = node.getSourceFile();
 		const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
-		console.error(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character}`);
+		console.error(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character + 1}`);
 		return ts.isSourceFile(node.parent) ? "" : "null";
 	}
 
 	const source = node.getSourceFile();
 	const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
 	console.log(`Unsupported syntax ${ts.SyntaxKind[node.kind]} (kind ${node.kind}) was not transpiled: ${node.getText()}`);
-	console.log(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character}`);
+	console.log(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character + 1}`);
 	return "";
 }
 
@@ -134,7 +191,7 @@ export function transpileProgram(entryFileRelativePath: string) {
 		process.exit(1);
 	}
 
-	const start = Date.now();
+	let start = Date.now();
 
 	const tsconfigPath = findProjectRoot(process.cwd(), "tsconfig.json") + "/tsconfig.json";
 	const res = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
@@ -143,7 +200,7 @@ export function transpileProgram(entryFileRelativePath: string) {
 
 	program = ts.createProgram({
 		rootNames: parsed.fileNames,
-		options: parsed.options,
+		options: Object.assign(parsed.options, { noLib: true }),
 		// rootNames: [ctx.currentFilePath],
 		// options: {
 		// 	target: ts.ScriptTarget.Latest,
@@ -152,6 +209,9 @@ export function transpileProgram(entryFileRelativePath: string) {
 		// 	verbatimModuleSyntax: true,
 		// },
 	});
+
+	console.log(`Program creation took ${Date.now() - start} ms`);
+	start = Date.now();
 
 	checker = program.getTypeChecker();
 	handlers = createHandlers();
@@ -181,10 +241,16 @@ export function transpileProgram(entryFileRelativePath: string) {
 	// 	output.push(result);
 	// }
 
+	if (anonFunctions.size) {
+		for (const declaration of anonFunctions.values())
+			ctx.output.unshift(declaration);
+	}
+
 	if (calledUtilFunctions.size) {
 		for (const call of calledUtilFunctions.keys())
 			ctx.output.unshift(utilFunctions[call]);
 	}
+
 
 	console.log(`Transpiling took ${Date.now() - start} ms`);
 
@@ -201,7 +267,7 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 
 	ctx.currentFilePath = sourceFile.fileName;
 	ctx.currentFolder = path.dirname(sourceFile.fileName);
-	ctx.namedImports = {};
+	ctx.namedImports[sourceFile.fileName] = {};
 
 	sourceFile.forEachChild((node) => {
 		const result = handleNode(node, ctx);

@@ -8,7 +8,7 @@ function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileConte
 
 	const namedImport = node.importClause?.namedBindings;
 	if (namedImport && ts.isNamespaceImport(namedImport)) {
-		ctx.namedImports[namedImport.name.text] = true;
+		ctx.namedImports[ctx.currentFilePath]![namedImport.name.text] = true;
 	}
 
 	// Types only

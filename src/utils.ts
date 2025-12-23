@@ -5,6 +5,56 @@ import parseCode from "./parser";
 import { apiNameMap } from "./replaceKeywords";
 import { calledUtilFunctions, checker, program, utilFunctions } from "./transpiler";
 
+const knownOperators: Record<string, boolean> = {
+	"=": true,
+	"+": true,
+	"+=": true,
+	"-": true,
+	"-=": true,
+	"++": true,
+	"--": true,
+	"**": true,
+	"&&": true,
+	"==": true,
+	"===": true,
+	"!=": true,
+	"!==": true,
+	"??": true,
+	"??=": true,
+	"in": true,
+	"||": true,
+	"<": true,
+	"<=": true,
+	">": true,
+	">=": true,
+	"*": true,
+	"/": true,
+	"%": true,
+	"~": true,
+	"&": true,
+	"|": true,
+	"^": true,
+	"<<": true,
+	">>": true,
+	">>>": true,
+};
+
+export function getOperatorToken(node: ts.Node) {
+	let operatorToken = ts.tokenToString(node.kind);
+	if (!operatorToken) return null;
+	
+	if (!knownOperators[operatorToken])
+			throw `Can't handle operator '${operatorToken}' yet`;
+
+	if (operatorToken == "**") operatorToken = "^";
+	else if (operatorToken == "||") operatorToken = "or";
+	else if (operatorToken == "&&") operatorToken = "and";
+	else if (operatorToken == "===") operatorToken = "==";
+	else if (operatorToken == "!==") operatorToken = "!=";
+
+	return operatorToken;
+}
+
 export function nodeIsFunction(node: ts.Node) {
 	const type = checker.getTypeAtLocation(node);
 
@@ -29,13 +79,13 @@ export function getSourceFiles(absPath: string): ts.SourceFile[] {
 	const output: ts.SourceFile[] = [];
 
 	const filePaths = [absPath];
-	
+
 	while (filePaths.length) {
 		const file = filePaths.shift()!;
-		
+
 		const stat = fs.statSync(file);
 		if (stat.isDirectory()) {
-			filePaths.push(...fs.readdirSync(absPath).map(name => path.join(absPath, name)))
+			filePaths.push(...fs.readdirSync(absPath).map(name => path.join(absPath, name)));
 			continue;
 		}
 
@@ -48,7 +98,7 @@ export function getSourceFiles(absPath: string): ts.SourceFile[] {
 		const source = parseCode(file, fs.readFileSync(file, { encoding: "utf-8" }));
 		output.push(source);
 	}
-	
+
 	return output;
 }
 

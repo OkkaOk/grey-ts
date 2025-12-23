@@ -5,13 +5,27 @@ function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): strin
 	if (!node.condition || !node.initializer || !node.incrementor) {
 		throw "Can't transpile this type of for loop.";
 	}
-	// TODO: Ugh
-	return `\
-${handleNode(node.initializer, ctx).split("\n").map(v => v + " - 1").join("\n")}
-while (${handleNode(node.condition, ctx)} - 1)
-${handleNode(node.incrementor, ctx)}
-${handleNode(node.statement, ctx)}
-end while`;
+
+	const initializer = handleNode(node.initializer, ctx);
+	const condition = handleNode(node.condition, ctx);
+	const incrementor = handleNode(node.incrementor, ctx);
+	const statement = handleNode(node.statement, ctx);
+
+	const output = [
+		`val_incremented = 1`,
+		`${initializer}`,
+		`while (${condition})`,
+		`	if (not val_incremented) then`,
+		`		${incrementor}`,
+		`	end if`,
+		`	val_incremented = 0`,
+		`	${statement}`,
+		`	${incrementor}`,
+		`	val_incremented = 1`,
+		`end while`,
+	].join("\n");
+	
+	return output;
 }
 
 function handleForOfStatement(node: ts.ForOfStatement, ctx: TranspileContext): string {
@@ -53,6 +67,12 @@ function handleWhileStatement(node: ts.WhileStatement, ctx: TranspileContext): s
 	return `while ${expression}\n${handleNode(node.statement, ctx)}\nend while`;
 }
 
+function handleDoStatement(node: ts.DoStatement, ctx: TranspileContext): string {
+	const expression = handleNode(node.expression, ctx);
+
+	return `did_once = 0\nwhile not did_once or ${expression}\ndid_once = 1\n${handleNode(node.statement, ctx)}\nend while`;
+}
+
 function createStatementHandlers() {
 	return {
 		[ts.SyntaxKind.ForStatement]: handleForStatement,
@@ -62,6 +82,8 @@ function createStatementHandlers() {
 		[ts.SyntaxKind.ContinueStatement]: (_node: ts.ContinueStatement) => "continue",
 		[ts.SyntaxKind.BreakStatement]: (_node: ts.BreakStatement) => "break",
 		[ts.SyntaxKind.WhileStatement]: handleWhileStatement,
+		[ts.SyntaxKind.DoStatement]: handleDoStatement,
+		// TODO: switch statement, maybe trycatch and throw somehow
 	};
 }
 

@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { handleNode, type TranspileContext } from "../transpiler";
+import { createAnonFunction, handleNode, type TranspileContext } from "../transpiler";
 
 function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration>; }, ctx: TranspileContext) {
 	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
@@ -40,14 +40,20 @@ function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): str
 	// if (ts.isBinaryExpression(node.parent) && !Object.is(node.parent.right, node)) {
 	// 	throw "Inline arrow functions are not supported.";
 	// }
-	if (!ts.isVariableDeclaration(node.parent) && !ts.isBinaryExpression(node.parent)) {
-		throw "Inline anonymous arrow functions are not supported yet.";
-	}
 
-	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
+	const params = node.parameters.map(param => handleNode(param, ctx));
 	const body = ts.isBlock(node.body) ? handleNode(node.body, ctx) : `return ${handleNode(node.body, ctx)}`;
 
-	return `function(${params})\n\t${body}\nend function`;
+	if (ts.isCallExpression(node.parent)) {
+		return "@" + createAnonFunction(body, params).name;
+	}
+
+	if (ts.isPropertyAssignment(node.parent) || ts.isVariableDeclaration(node.parent) || ts.isBinaryExpression(node.parent)) {
+		return `function(${params.join(", ")})\n\t${body}\nend function`;
+	}
+
+	const kind = ts.SyntaxKind[node.parent.kind]
+	throw `This kind of arrow function is not yet supported (parent: ${kind} (${node.parent.kind}))`;
 }
 
 function handleFunctionExpression(node: ts.FunctionExpression, ctx: TranspileContext): string {

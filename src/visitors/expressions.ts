@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
 import { calledUtilFunctions, checker, handleNode, transpileSourceFile, type TranspileContext } from "../transpiler";
-import { asRef, callUtilFunction, getSourceFiles, nodeIsFunction, replaceIdentifier } from "../utils";
+import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunction, replaceIdentifier } from "../utils";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: TranspileContext): string {
 	const left = handleNode(node.expression, ctx);
@@ -21,7 +21,7 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 
 	// We've imported something like this: import * as lib from "mylib"
 	// Next when we use lib.func() we omit the lib. so it becomes func()
-	if (ctx.namedImports[left])
+	if (ctx.namedImports[ctx.currentFilePath]![left])
 		return isFunction ? asRef(right) : right;
 
 	// if (node.questionDotToken) {
@@ -113,6 +113,26 @@ function handleCallExpression(node: ts.CallExpression, ctx: TranspileContext): s
 		args.unshift(name.slice(0, dotI));
 		return args.join(" + ");
 	}
+	else if (symbolFullName === "Array.map") {
+		if (!args.length) throw "Invalid argument count";
+		return callUtilFunction("array_map", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
+	}
+	else if (symbolFullName === "Array.filter") {
+		if (!args.length) throw "Invalid argument count";
+		return callUtilFunction("array_filter", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
+	}
+	else if (symbolFullName === "Array.find") {
+		if (!args.length) throw "Invalid argument count";
+		return callUtilFunction("array_find", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
+	}
+	else if (symbolFullName === "Array.some") {
+		if (!args.length) throw "Invalid argument count";
+		return callUtilFunction("array_some", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
+	}
+	else if (symbolFullName === "Array.every") {
+		if (!args.length) throw "Invalid argument count";
+		return callUtilFunction("array_every", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
+	}
 
 	if (symbolFullName === "GreyHack.include") {
 		if (!node.arguments.length) return "";
@@ -167,37 +187,8 @@ function handleNewExpression(node: ts.NewExpression, ctx: TranspileContext): str
 	return output;
 }
 
-const knownOperators: Record<string, boolean> = {
-	"=": true,
-	"+": true,
-	"+=": true,
-	"-": true,
-	"-=": true,
-	"++": true,
-	"--": true,
-	"**": true,
-	"&&": true,
-	"==": true,
-	"===": true,
-	"!=": true,
-	"!==": true,
-	"??": true,
-	"??=": true,
-	"in": true,
-	"||": true,
-	"<": true,
-	"<=": true,
-	">": true,
-	">=": true,
-	"*": true,
-	"/": true,
-	"%": true,
-};
-
 function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext): string {
-	let operatorToken = ts.tokenToString(node.operatorToken.kind) || node.operatorToken.getText();
-	if (!knownOperators[operatorToken])
-		throw `Can't handle operator '${operatorToken}' yet`;
+	const operatorToken = getOperatorToken(node.operatorToken) || node.operatorToken.getText();
 
 	const right = handleNode(node.right, ctx);
 
@@ -226,6 +217,24 @@ function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext
 	else if (operatorToken === "in") {
 		return `${right}.hasIndex(${handleNode(node.left, ctx)})`;
 	}
+	else if (operatorToken === "&") {
+		return `bitwise("&", ${handleNode(node.left, ctx)}, ${right})`
+	}
+	else if (operatorToken === "|") {
+		return `bitwise("|", ${handleNode(node.left, ctx)}, ${right})`
+	}
+	else if (operatorToken === "^") {
+		return `bitwise("^", ${handleNode(node.left, ctx)}, ${right})`
+	}
+	else if (operatorToken === "<<") {
+		return `bitwise("<<", ${handleNode(node.left, ctx)}, ${right})`
+	}
+	else if (operatorToken === ">>") {
+		return `bitwise(">>", ${handleNode(node.left, ctx)}, ${right})`
+	}
+	else if (operatorToken === ">>>") {
+		return `bitwise(">>>", ${handleNode(node.left, ctx)}, ${right})`
+	}
 
 	if (operatorToken === "=") ctx.isAssignment = true;
 	const left = handleNode(node.left, ctx);
@@ -234,12 +243,6 @@ function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext
 	// console.log(checker.getTypeAtLocation(node.right).flags, ts.TypeFlags.Undefined)
 	if (operatorToken == "+=" || operatorToken == "-=")
 		return `${left} = ${left} ${operatorToken[0]} ${right}`;
-
-	if (operatorToken == "**") operatorToken = "^";
-	else if (operatorToken == "||") operatorToken = "or";
-	else if (operatorToken == "&&") operatorToken = "and";
-	else if (operatorToken == "===") operatorToken = "==";
-	else if (operatorToken == "!==") operatorToken = "!=";
 
 	return `${left} ${operatorToken} ${right}`;
 }
@@ -252,20 +255,23 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 	const operand = handleNode(node.operand, ctx);
 
 	const operator = ts.tokenToString(node.operator);
-	if (operator == "++")
+	if (operator === "++")
 		return `${operand} = ${operand} + 1`;
 
-	if (operator == "--")
+	if (operator === "--")
 		return `${operand} = ${operand} - 1`;
 
-	if (operator == "!")
+	if (operator === "!")
 		return `not ${operand}`;
 
-	if (operator == "-")
+	if (operator === "-")
 		return `-${operand}`;
 
-	if (operator == "+")
+	if (operator === "+")
 		return `${operand}.val()`;
+
+	if (operator === "~")
+		return `bitwise("~", ${operand})`;
 
 	throw `Couldn't handle this UnaryExpression: ${node.getText()}`;
 }
@@ -375,7 +381,7 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 			continue;
 		}
 
-		if (ts.isPropertyAssignment(item) && ts.isFunctionExpression(item.initializer)) {
+		if (ts.isPropertyAssignment(item) && (ts.isFunctionExpression(item.initializer) || ts.isArrowFunction(item.initializer))) {
 			if (!objectName)
 				throw "You can't have method declarations inside an object that is not being assigned to a variable";
 			funcs.push(`${objectName}.${handleNode(item.name, ctx)} = ${handleNode(item.initializer, ctx)}`);
@@ -446,16 +452,14 @@ function handleTemplateSpan(node: ts.TemplateSpan, ctx: TranspileContext): strin
 }
 
 function handleConditionalExpression(node: ts.ConditionalExpression, ctx: TranspileContext): string {
-	if (node.parent.kind === ts.SyntaxKind.CallExpression) {
-		throw "Conditional expressions are not supported inside call expressions.";
+	if (ts.isCallExpression(node.whenTrue) || ts.isCallExpression(node.whenFalse)) {
+		throw "Call expressions are not supported inside conditional expressions yet"; // TODO: think of a solution for this
 	}
 
-	return `\
-if (${handleNode(node.condition, ctx)}) then
-	${handleNode(node.whenTrue, ctx)}
-else
-	${handleNode(node.whenFalse, ctx)}
-end if`;
+	const condition = handleNode(node.condition, ctx);
+	const whenTrue = handleNode(node.whenTrue, ctx);
+	const whenFalse = handleNode(node.whenFalse, ctx);
+	return callUtilFunction("conditional_expr", condition, whenTrue, whenFalse);
 }
 
 function createExpressionHandlers() {
