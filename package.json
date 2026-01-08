@@ -7,6 +7,7 @@
 		"greyts": "dist/index.js"
 	},
 	"type": "module",
+	"types": "./dist/index.d.ts",
 	"private": true,
 	"license": "MIT",
 	"keywords": [

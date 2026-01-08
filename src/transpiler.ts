@@ -47,6 +47,7 @@ export const utilFunctions = {
 		"assign_objects = function(target, sources)",
 		"	for source in sources",
 		"		if (typeof(source) == \"list\") then",
+		"			if (typeof(target) == \"list\" and not target.len() and source.len()) then target.push(null)",
 		"			for i in range(0, source.len() - 1, 1)",
 		"				target[str(i)] = source[i]",
 		"			end for",
@@ -112,6 +113,7 @@ export const utilFunctions = {
 		"end function",
 	].join("\n"),
 	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\nif (left == null) then return @right\nreturn @left\nend function",
+	"or_op": "or_op = function(left, right)\nif (not left) then return @right\nreturn @left\nend function",
 	"is_type": "is_type = function(value, type)\nif typeof(value) == type then return 1\nreturn 0\nend function",
 	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\nif cond then return when_true\nreturn when_false\nend function",
 }
@@ -178,13 +180,15 @@ export function handleNode(node: ts.Node, ctx: TranspileContext) {
 
 export function transpileProgram(entryFileRelativePath: string) {
 	const ctx: TranspileContext = {
-		currentFolder: process.cwd(),
+		currentFolder: "",
 		currentFilePath: path.resolve(process.cwd(), entryFileRelativePath),
 		namedImports: {},
 		visitedFiles: {},
 		sources: [],
 		output: [],
 	};
+
+	ctx.currentFolder = path.dirname(ctx.currentFilePath);
 
 	if (!fs.existsSync(ctx.currentFilePath)) {
 		console.error(`Error: file '${ctx.currentFilePath}' doesn't exist`);

@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
 import { calledUtilFunctions, checker, handleNode, transpileSourceFile, type TranspileContext } from "../transpiler";
-import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunction, replaceIdentifier } from "../utils";
+import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunction, replaceIdentifier, unRef } from "../utils";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: TranspileContext): string {
 	const left = handleNode(node.expression, ctx);
@@ -12,7 +12,7 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 
 	// console.log(node.name.text, symbol);
 	let right = replaceIdentifier(handleNode(node.name, ctx), symbol);
-	if (right[0] === "@") right = right.slice(1);
+	right = unRef(right);
 
 	const isFunction = nodeIsFunction(node.name);
 	// console.log(ts.SyntaxKind[node.kind], node.getText(), symbolFullName, right, isFunction);
@@ -22,7 +22,7 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 	// We've imported something like this: import * as lib from "mylib"
 	// Next when we use lib.func() we omit the lib. so it becomes func()
 	if (ctx.namedImports[ctx.currentFilePath]![left])
-		return isFunction ? asRef(right) : right;
+		return isFunction ? asRef(right) : unRef(right);
 
 	// if (node.questionDotToken) {
 
@@ -55,7 +55,7 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 	else if (output === "Function.prototype")
 		return "funcRef";
 
-	return isFunction ? asRef(output) : output;
+	return isFunction ? asRef(output) : unRef(output);
 }
 
 function handleElementAccessExpression(node: ts.ElementAccessExpression, ctx: TranspileContext): string {
@@ -188,7 +188,14 @@ function handleNewExpression(node: ts.NewExpression, ctx: TranspileContext): str
 }
 
 function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext): string {
+	// console.log(ts.SyntaxKind[node.parent.kind], node.getText())
 	const operatorToken = getOperatorToken(node.operatorToken) || node.operatorToken.getText();
+
+	// Chained assignment are not a thing in GreyScript/MiniScript.
+	// TODO: Maybe figure out an alternative way or keep as is
+	if (operatorToken === "=" && ts.isBinaryExpression(node.right) && node.right.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+		throw "Assignment chaining is not supported"
+	}
 
 	const right = handleNode(node.right, ctx);
 
@@ -204,6 +211,11 @@ function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext
 
 			return `${handleNode(node.left.expression, ctx)}.${node.left.name.text}(${right})`;
 		}
+	}
+
+	if (operatorToken === "or" && (ts.isVariableDeclaration(node.parent) || ts.isPropertyAssignment(node.parent))) {
+		const left = handleNode(node.left, ctx);
+		return callUtilFunction("or_op", left, right);
 	}
 
 	if (operatorToken === "??") {
@@ -429,11 +441,9 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 
 // e.g. `Hello ${name}`
 function handleTemplateExpression(node: ts.TemplateExpression, ctx: TranspileContext): string {
-	// console.log(node);
-
 	const head = handleNode(node.head, ctx);
 	const strings = [
-		...(head ? [`\"${head}\"`] : []),
+		...(head ? [`"${head}"`] : []),
 		...node.templateSpans.map(span => handleNode(span, ctx)),
 	];
 	const output = strings.join(" + ");
@@ -447,7 +457,13 @@ function handleTemplateHead(node: ts.TemplateHead): string {
 
 function handleTemplateSpan(node: ts.TemplateSpan, ctx: TranspileContext): string {
 	let output = handleNode(node.expression, ctx);
-	if (node.literal.text) output += ` + \"${node.literal.text}\"`;
+
+	// Not sure if necessary
+	if (ts.isBinaryExpression(node.expression))
+		output = `str(${output})`;
+
+	// The literal is the text after the expression. Is an empty string if a new TemplateSpan is right after like this ${first}${second}
+	if (node.literal.text) output += ` + "${node.literal.text}"`;
 	return output;
 }
 

@@ -17,6 +17,7 @@ function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): strin
 		`while (${condition})`,
 		`	if (not val_incremented) then`,
 		`		${incrementor}`,
+		`		if (not ${condition}) then break`,
 		`	end if`,
 		`	val_incremented = 0`,
 		`	${statement}`,
@@ -43,8 +44,13 @@ function handleForInStatement(node: ts.ForInStatement, ctx: TranspileContext): s
 }
 
 function handleIfStatement(node: ts.IfStatement, ctx: TranspileContext): string {
-	let output = `if (${handleNode(node.expression, ctx)}) then\n${handleNode(node.thenStatement, ctx)}`;
-	// TODO: one liner
+	const condition = handleNode(node.expression, ctx);
+	const thenStatement = handleNode(node.thenStatement, ctx);
+
+	if (!ts.isBlock(node.thenStatement) && !node.elseStatement && node.parent.kind !== ts.SyntaxKind.IfStatement)
+		return `if (${condition}) then ${thenStatement}`;
+
+	let output = `if (${condition}) then\n${thenStatement}`;
 
 	if (node.elseStatement) {
 		if (ts.isIfStatement(node.elseStatement)) {

@@ -64,3 +64,5 @@ else {
 	console.log(`Invalid command: ${command}`);
 	process.exit(127);
 }
+
+export { transpileProgram };

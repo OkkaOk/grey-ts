@@ -5,46 +5,21 @@ import parseCode from "./parser";
 import { apiNameMap } from "./replaceKeywords";
 import { calledUtilFunctions, checker, program, utilFunctions } from "./transpiler";
 
-const knownOperators: Record<string, boolean> = {
-	"=": true,
-	"+": true,
-	"+=": true,
-	"-": true,
-	"-=": true,
-	"++": true,
-	"--": true,
-	"**": true,
-	"&&": true,
-	"==": true,
-	"===": true,
-	"!=": true,
-	"!==": true,
-	"??": true,
-	"??=": true,
-	"in": true,
-	"||": true,
-	"<": true,
-	"<=": true,
-	">": true,
-	">=": true,
-	"*": true,
-	"/": true,
-	"%": true,
-	"~": true,
-	"&": true,
-	"|": true,
-	"^": true,
-	"<<": true,
-	">>": true,
-	">>>": true,
-};
+const knownOperators = [
+	"=", "+", "+=", "-", "-=", "++", "--", "**",
+	"&&", "==", "===", "!=", "!==", "??", "??=", "in", 
+	"||", "<", "<=", ">", ">=", "*", "/", "%",
+	"~", "&", "|", "^", "<<", ">>", ">>>"
+];
+
+const knownOperatorsMap = new Map(knownOperators.map(op => [op, true] as const));
 
 export function getOperatorToken(node: ts.Node) {
 	let operatorToken = ts.tokenToString(node.kind);
 	if (!operatorToken) return null;
-	
-	if (!knownOperators[operatorToken])
-			throw `Can't handle operator '${operatorToken}' yet`;
+
+	if (!knownOperatorsMap.has(operatorToken))
+		throw `Can't handle operator '${operatorToken}' yet`;
 
 	if (operatorToken == "**") operatorToken = "^";
 	else if (operatorToken == "||") operatorToken = "or";
@@ -70,6 +45,12 @@ export function nodeIsFunction(node: ts.Node) {
 export function asRef(value: string): string {
 	if (value[0] === "@") return value;
 	return "@" + value;
+}
+
+export function unRef(value: string): string {
+	while (value[0] === "@")
+		value = value.slice(1);
+	return value;
 }
 
 export function getSourceFiles(absPath: string): ts.SourceFile[] {

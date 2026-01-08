@@ -12,13 +12,6 @@ function handleBlock(node: ts.Block, ctx: TranspileContext): string {
 	return node.statements.map(val => handleNode(val, ctx)).join("\n\t");
 }
 
-function handleConstructor(node: ts.ConstructorDeclaration, ctx: TranspileContext): string {
-	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
-	const body = node.body ? handleBlock(node.body, ctx) : "";
-
-	return `constructor = function(${params})\n\t${body}\nreturn self\nend function`;
-}
-
 // Methods inside classes and objects
 function handleMethodDeclaration(node: ts.MethodDeclaration, ctx: TranspileContext): string {
 	// if (ts.isObjectLiteralExpression(node.parent)) {
@@ -29,6 +22,11 @@ function handleMethodDeclaration(node: ts.MethodDeclaration, ctx: TranspileConte
 }
 
 function handleFunctionDeclaration(node: ts.FunctionDeclaration, ctx: TranspileContext): string {
+	// TODO: confirm this
+	// Is a function overload.
+	if (!node.body)
+		return "";
+
 	if (node.modifiers?.some(m => m.kind === ts.SyntaxKind.DeclareKeyword))
 		return "";
 
@@ -63,7 +61,6 @@ function handleFunctionExpression(node: ts.FunctionExpression, ctx: TranspileCon
 function createFunctionHandlers() {
 	return {
 		[ts.SyntaxKind.Block]: handleBlock,
-		[ts.SyntaxKind.Constructor]: handleConstructor,
 		[ts.SyntaxKind.MethodDeclaration]: handleMethodDeclaration,
 		[ts.SyntaxKind.FunctionDeclaration]: handleFunctionDeclaration,
 		[ts.SyntaxKind.ArrowFunction]: handleArrowFunction,

@@ -22,8 +22,6 @@ function handleComputedPropertyName(node: ts.ComputedPropertyName, ctx: Transpil
 	return handleNode(node.expression, ctx);
 }
 
-
-
 function createAssignmentHandlers() {
 	return {
 		[ts.SyntaxKind.PropertyAssignment]: handlePropertyAssignment,
