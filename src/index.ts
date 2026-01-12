@@ -53,7 +53,7 @@ if (command === "transpile") {
 	if (!fs.existsSync(outDirPath))
 		fs.mkdirSync(outDirPath);
 
-	const outFileName = args.length > 1 ? args[1]! : "output.gs";
+	const outFileName = args.length > 1 ? args[1]! : `${path.basename(entryFile).replace(".ts", ".gs")}`;
 
 	// TODO: split to multiple if over 160k characters. Or let greybel handle it?
 	const outFilePath = path.join(outDirPath, outFileName);

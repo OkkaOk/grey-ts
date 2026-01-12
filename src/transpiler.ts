@@ -38,6 +38,10 @@ export const utilFunctions = {
 	"get_property": [
 		"get_property = function(obj, key)",
 		"	if not obj then return null",
+		"	if obj isa list and list.hasIndex(key) then return obj[key]()",
+		"	if obj isa map and map.hasIndex(key) then return obj[key]()",
+		"	if obj isa string and string.hasIndex(key) then return obj[key]()",
+		"	if obj isa number and number.hasIndex(key) then return obj[key]()",
 		"	if (obj.hasIndex(key)) then return @obj[key]",
 		`	if (obj.hasIndex("__isa")) then return get_property(obj["__isa"], key)`,
 		"	return null",
@@ -112,10 +116,10 @@ export const utilFunctions = {
 		"	return 1",
 		"end function",
 	].join("\n"),
-	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\nif (left == null) then return @right\nreturn @left\nend function",
-	"or_op": "or_op = function(left, right)\nif (not left) then return @right\nreturn @left\nend function",
-	"is_type": "is_type = function(value, type)\nif typeof(value) == type then return 1\nreturn 0\nend function",
-	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\nif cond then return when_true\nreturn when_false\nend function",
+	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif (left == null) then return @right\n\treturn @left\nend function",
+	"or_op": "or_op = function(left, right)\n\tif (not left) then return @right\n\treturn @left\nend function",
+	"is_type": "is_type = function(value, type)\n\tif typeof(value) == type then return 1\n\treturn 0\nend function",
+	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return when_true\n\treturn when_false\nend function",
 }
 
 function createHandlers() {

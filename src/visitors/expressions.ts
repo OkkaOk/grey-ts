@@ -1,21 +1,18 @@
 import path from "node:path";
 import ts from "typescript";
 import { calledUtilFunctions, checker, handleNode, transpileSourceFile, type TranspileContext } from "../transpiler";
-import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunction, replaceIdentifier, unRef } from "../utils";
+import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunction, replaceIdentifier, replacePropertyAccess, unRef } from "../utils";
 
 function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: TranspileContext): string {
 	const left = handleNode(node.expression, ctx);
-	// const right = handleNode(node.name, ctx);
+	let right = handleNode(node.name, ctx);
 
-	const leftType = checker.getTypeAtLocation(node.expression);
-	const symbol = leftType.getProperty(node.name.text);
+	const nodeSymbol = checker.getSymbolAtLocation(node);
 
-	// console.log(node.name.text, symbol);
-	let right = replaceIdentifier(handleNode(node.name, ctx), symbol);
+	right = replaceIdentifier(right, checker.getTypeAtLocation(node.expression), right);
 	right = unRef(right);
 
 	const isFunction = nodeIsFunction(node.name);
-	// console.log(ts.SyntaxKind[node.kind], node.getText(), symbolFullName, right, isFunction);
 
 	// TODO: Remove @ from getters. Or just improve the system
 
@@ -28,7 +25,7 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 
 	// }
 
-	let getSafely = !!node.questionDotToken;
+	let getSafely = !!node.questionDotToken && !ts.isNonNullExpression(node.parent);
 
 	const rightType = checker.getTypeAtLocation(node.name);
 	if (!ctx.isAssignment && rightType.isUnion()) {
@@ -43,17 +40,10 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 
 	// console.log(node.name.text, checker.getTypeAtLocation(node.name))
 
-	const output = `${left}.${right}`;
-	if (output === "String.prototype")
-		return "string";
-	else if (output === "Number.prototype")
-		return "number";
-	else if (output === "Object.prototype")
-		return "map";
-	else if (output === "Array.prototype")
-		return "list";
-	else if (output === "Function.prototype")
-		return "funcRef";
+	// console.log(checker.typeToString(leftType), symbol ? checker.getFullyQualifiedName(symbol) : "")
+
+	let output = `${left}.${right}`;
+	output = replacePropertyAccess(output, nodeSymbol);
 
 	return isFunction ? asRef(output) : unRef(output);
 }
@@ -61,18 +51,17 @@ function handlePropertyAccessExpression(node: ts.PropertyAccessExpression, ctx: 
 function handleElementAccessExpression(node: ts.ElementAccessExpression, ctx: TranspileContext): string {
 	const left = handleNode(node.expression, ctx);
 	let right: string;
+	
 
 	if (ts.isStringLiteral(node.argumentExpression)) {
 		const leftType = checker.getTypeAtLocation(node.expression);
-		const symbol = leftType.getProperty(node.argumentExpression.text);
-
-		right = `"${replaceIdentifier(node.argumentExpression.text, symbol)}"`;
+		right = `"${replaceIdentifier(node.argumentExpression.text, leftType, node.argumentExpression.text)}"`;
 	}
 	else {
 		right = handleNode(node.argumentExpression, ctx);
 	}
 
-	if (!ctx.isAssignment) {
+	if (!ctx.isAssignment && !ts.isNumericLiteral(node.argumentExpression)) {
 		return callUtilFunction("get_property", left, `${right}`);
 	}
 
@@ -518,9 +507,7 @@ function createExpressionHandlers() {
 			const left = handleNode(pnode.expression, ctx);
 
 			const leftType = checker.getTypeAtLocation(pnode.expression);
-			const symbol = leftType.getProperty(pnode.name.text);
-
-			const right = replaceIdentifier(handleNode(pnode.name, ctx), symbol);
+			const right = replaceIdentifier(handleNode(pnode.name, ctx), leftType, pnode.name.text);
 			return `${left}.remove(${right})`;
 		}
 	};

@@ -13,12 +13,12 @@ function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 
 	if (type.isUnion()) {
 		for (const t of type.types) {
-			name = replaceIdentifier(node.text, t.symbol)
+			name = replaceIdentifier(node.text, t)
 			if (name != original) break
 		}
 	}
 	else {
-		name = replaceIdentifier(node.text, type.symbol)
+		name = replaceIdentifier(node.text, type)
 	}
 
 	// Alternatively could check if the parent is a CallExpression or NewExpression

@@ -2,23 +2,21 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import parseCode from "./parser";
-import { apiNameMap } from "./replaceKeywords";
+import { apiNameMap, propertyAccessReplacements } from "./replaceKeywords";
 import { calledUtilFunctions, checker, program, utilFunctions } from "./transpiler";
 
-const knownOperators = [
+const knownOperators = new Set([
 	"=", "+", "+=", "-", "-=", "++", "--", "**",
 	"&&", "==", "===", "!=", "!==", "??", "??=", "in", 
 	"||", "<", "<=", ">", ">=", "*", "/", "%",
 	"~", "&", "|", "^", "<<", ">>", ">>>"
-];
-
-const knownOperatorsMap = new Map(knownOperators.map(op => [op, true] as const));
+]);
 
 export function getOperatorToken(node: ts.Node) {
 	let operatorToken = ts.tokenToString(node.kind);
 	if (!operatorToken) return null;
 
-	if (!knownOperatorsMap.has(operatorToken))
+	if (!knownOperators.has(operatorToken))
 		throw `Can't handle operator '${operatorToken}' yet`;
 
 	if (operatorToken == "**") operatorToken = "^";
@@ -63,10 +61,9 @@ export function getSourceFiles(absPath: string): ts.SourceFile[] {
 
 	while (filePaths.length) {
 		const file = filePaths.shift()!;
-
 		const stat = fs.statSync(file);
 		if (stat.isDirectory()) {
-			filePaths.push(...fs.readdirSync(absPath).map(name => path.join(absPath, name)));
+			filePaths.push(...fs.readdirSync(file).map(name => path.join(file, name)));
 			continue;
 		}
 
@@ -83,17 +80,52 @@ export function getSourceFiles(absPath: string): ts.SourceFile[] {
 	return output;
 }
 
-export function replaceIdentifier(defaultValue: string, symbol?: ts.Symbol): string {
-	if (!symbol) return defaultValue;
+export function replaceIdentifier(original: string, type: ts.Type, propertyName?: string): string {
+	let symbol: ts.Symbol | undefined;
+	if (type.isUnion()) {
+		if (propertyName) {
+			for (const t of type.types) {
+				symbol = t.getProperty(propertyName);
+				if (symbol) break; 
+			}
+		}
+		else {
+			symbol = type.types.find(t => t.flags !== ts.TypeFlags.Undefined && t.symbol)?.symbol;
+		}
+	}
+	else {
+		symbol = propertyName ? type.getProperty(propertyName) : type.symbol;
+	}
+
+	if (!symbol) return original;
 
 	const symbolFullName = checker.getFullyQualifiedName(symbol);
 
-	// console.log(defaultValue, symbolFullName, symbolFullName === "length" ? symbol : undefined);
-	const match: [string, string] | undefined = apiNameMap[symbolFullName];
-	if (match && match[0] === defaultValue)
-		return match[1];
+	// console.log(original, symbolFullName);
+	const replaceValue: string | undefined = apiNameMap[symbolFullName];
+	if (!replaceValue)
+		return original;
 
-	return defaultValue;
+	// Without this for example this happens: "const oldUserInput = userInput" would turn into "@user_input = @user_input"
+	const dotIndex = symbolFullName.lastIndexOf(".");
+	const strToReplace = dotIndex !== null ? symbolFullName.slice(dotIndex + 1) : symbolFullName;
+	if (strToReplace != original)
+		return original;
+
+	return replaceValue;
+}
+
+export function replacePropertyAccess(original: string, symbol?: ts.Symbol) {
+	if (!symbol) return original;
+
+	const symbolFullName = checker.getFullyQualifiedName(symbol);
+
+	const replaceValue: string | undefined = propertyAccessReplacements[symbolFullName];
+	// console.log(original, symbolFullName, replaceValue);
+	if (!replaceValue || original !== symbolFullName)
+		return original;
+
+	return replaceValue;
 }
 
 export function findProjectRoot(dir: string, fileToSearch = "package.json"): string {
