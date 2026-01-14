@@ -47,7 +47,7 @@ function handleIfStatement(node: ts.IfStatement, ctx: TranspileContext): string 
 	const condition = handleNode(node.expression, ctx);
 	const thenStatement = handleNode(node.thenStatement, ctx);
 
-	if (!ts.isBlock(node.thenStatement) && !node.elseStatement && node.parent.kind !== ts.SyntaxKind.IfStatement)
+	if (!ts.isBlock(node.thenStatement) && !ts.isIfStatement(node.thenStatement) && !node.elseStatement && node.parent.kind !== ts.SyntaxKind.IfStatement)
 		return `if (${condition}) then ${thenStatement}`;
 
 	let output = `if (${condition}) then\n${thenStatement}`;

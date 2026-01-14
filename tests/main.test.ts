@@ -1,22 +1,28 @@
 import { expect, test } from "bun:test";
 import path from "node:path";
 import { describe } from "node:test";
-import { transpileProgram } from "../src/transpiler";
+import { transpileString } from "../src/transpiler";
 
 const rootDir = path.resolve(__dirname, "..");
 
 describe("Replace Identifiers", () => {
-	const lines = transpileProgram(path.join(rootDir, "tests/replaceIdentifiers.ts")).split("\n");
-
-	test("getShell", () => {
-		expect(lines[0]).toEqual("shell = get_shell()");
-	});
-
-	test("ip", () => {
-		expect(lines[1]).toEqual("ip = shell.host_computer.local_ip");
+	test("hostComputer", () => {
+		expect(
+			transpileString("const shell = getShell().hostComputer")
+		).toEqual("shell = get_shell().host_computer");
 	});
 
 	test("userInput", () => {
-		expect(lines[2]).toEqual("@oldUserInput = @user_input");
+		expect(
+			transpileString(`
+				const oldUserInput = userInput;
+				userInput = (msg = "", isPassword = false, anyKey = false, addToHist = false) => oldUserInput(msg, isPassword, anyKey);
+			`).replaceAll("\t", "")
+		).toEqual(`\
+			oldUserInput = @user_input
+			@user_input = function(msg = "", isPassword = 0, anyKey = 0, addToHist = 0)
+				return oldUserInput(msg, isPassword, anyKey)
+			end function\
+		`.replaceAll("\t", ""));
 	});
 });

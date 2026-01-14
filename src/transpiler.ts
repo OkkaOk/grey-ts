@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import ts, { type SourceFile } from "typescript";
 
+import parseCode from "./parser.js";
 import { findProjectRoot } from "./utils.js";
 import createAssignmentHandlers from "./visitors/assignments.js";
 import createClassHandlers from "./visitors/classes.js";
@@ -20,9 +21,8 @@ type Mode = "ts" | "js";
 export type TranspileContext = {
 	currentFilePath: string;
 	currentFolder: string;
-	namedImports: Record<string, Record<string, boolean>>;
-	inFunctionCall?: boolean;
-	isAssignment?: boolean;
+	namespaceImports: Record<string, Set<string>>;
+	namedImports: Record<string, Record<string, string>>;
 	basePath?: string;
 	mode?: Mode;
 	visitedFiles: Record<string, boolean>;
@@ -116,6 +116,24 @@ export const utilFunctions = {
 		"	return 1",
 		"end function",
 	].join("\n"),
+	"math_min": [
+		"math_min = function(numbers)",
+		"	curr_min = null",
+		"	for num in numbers",
+		"		if not curr_min or num < curr_min then curr_min = num",
+		"	end for",
+		"	return curr_min",
+		"end function"
+	].join("\n"),
+	"math_max": [
+		"math_max = function(numbers)",
+		"	curr_max = null",
+		"	for num in numbers",
+		"		if not curr_max or num > curr_max then curr_max = num",
+		"	end for",
+		"	return curr_max",
+		"end function"
+	].join("\n"),
 	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif (left == null) then return @right\n\treturn @left\nend function",
 	"or_op": "or_op = function(left, right)\n\tif (not left) then return @right\n\treturn @left\nend function",
 	"is_type": "is_type = function(value, type)\n\tif typeof(value) == type then return 1\n\treturn 0\nend function",
@@ -154,12 +172,19 @@ export function createAnonFunction(body: string, params: string[]) {
 	return { name: nextName, str: result };
 }
 
+const handleTimes: Record<string, number> = {}
 export function handleNode(node: ts.Node, ctx: TranspileContext) {
-	// console.log(ts.SyntaxKind[node.kind], node.getText())
+	// console.log(ts.SyntaxKind[node.kind], node.kind, node.getText());
+	// const start = performance.now()
 	try {
 		const handler = handlers[node.kind];
 		if (handler) {
 			const result = handler(node, ctx);
+
+			// const kind = ts.SyntaxKind[node.kind];
+			// handleTimes[kind] ??= 0;
+			// handleTimes[kind] += performance.now() - start;
+
 			return result;
 		};
 	} catch (error) {
@@ -182,11 +207,53 @@ export function handleNode(node: ts.Node, ctx: TranspileContext) {
 // 	entryFileRelativePath: string,
 // }
 
+export function transpileString(typescriptString: string) {
+	const ctx: TranspileContext = {
+		currentFolder: process.cwd(),
+		currentFilePath: path.resolve(process.cwd(), "file.ts"),
+		namedImports: {},
+		namespaceImports: {},
+		visitedFiles: {},
+		sources: [],
+		output: [],
+	};
+
+	const sourceFile = parseCode("file.ts", typescriptString);
+
+	program = ts.createProgram({
+		rootNames: [sourceFile.fileName],
+		options: {
+			target: ts.ScriptTarget.Latest,
+			noLib: true,
+			types: ["@grey-ts/types"],
+			verbatimModuleSyntax: true,
+		},
+	});
+
+	checker = program.getTypeChecker();
+	handlers = createHandlers();
+
+	transpileSourceFile(sourceFile, ctx);
+
+	if (anonFunctions.size) {
+		for (const declaration of anonFunctions.values())
+			ctx.output.unshift(declaration);
+	}
+
+	if (calledUtilFunctions.size) {
+		for (const call of calledUtilFunctions.keys())
+			ctx.output.unshift(utilFunctions[call]);
+	}
+
+	return ctx.output.join("\n");
+}
+
 export function transpileProgram(entryFileRelativePath: string) {
 	const ctx: TranspileContext = {
 		currentFolder: "",
 		currentFilePath: path.resolve(process.cwd(), entryFileRelativePath),
 		namedImports: {},
+		namespaceImports: {},
 		visitedFiles: {},
 		sources: [],
 		output: [],
@@ -243,6 +310,8 @@ export function transpileProgram(entryFileRelativePath: string) {
 	// Todo: Maybe use worker threads if it takes too long to transpile
 	transpileSourceFile(entry, ctx);
 
+	// console.log(handleTimes)
+
 	// const output: string[] = [];
 	// for (const source of sources) {
 	// 	const result = transpileSourceFile(source, ctx);
@@ -265,7 +334,7 @@ export function transpileProgram(entryFileRelativePath: string) {
 	return ctx.output.join("\n");
 }
 
-export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext) {
+export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext, returnResult?: boolean) {
 	if (ctx.visitedFiles[sourceFile.fileName])
 		return "";
 
@@ -273,19 +342,29 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 
 	const prevFile = ctx.currentFilePath;
 
+	// printNodeAST(sourceFile);
+
 	ctx.currentFilePath = sourceFile.fileName;
 	ctx.currentFolder = path.dirname(sourceFile.fileName);
 	ctx.namedImports[sourceFile.fileName] = {};
+	ctx.namespaceImports[sourceFile.fileName] = new Set();
+
+	const output: string[] = [];
 
 	sourceFile.forEachChild((node) => {
 		const result = handleNode(node, ctx);
-		if (result) ctx.output.push(result);
+		if (result) {
+			if (!returnResult)
+				ctx.output.push(result)
+			else
+				output.push(result);
+		}
 	});
 
 	ctx.currentFilePath = prevFile;
 	ctx.currentFolder = path.dirname(prevFile);
 
 	console.log(`Transpiled ${path.basename(sourceFile.fileName)}`);
-	return "";
+	return output.join("\n");
 }
 

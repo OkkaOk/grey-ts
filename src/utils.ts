@@ -28,16 +28,38 @@ export function getOperatorToken(node: ts.Node) {
 	return operatorToken;
 }
 
-export function nodeIsFunction(node: ts.Node) {
-	const type = checker.getTypeAtLocation(node);
+export function nodeIsFunctionReference(node: ts.Node, type?: ts.Type) {
+	// Not a reference
+	if (ts.isCallOrNewExpression(node) || ts.isCallOrNewExpression(node.parent) && node === node.parent.expression)
+		return false;
 
-	if (type.getCallSignatures()[0]?.parameters)
-		return true;
+	// Declaring a function, not referencing
+	if (ts.isArrowFunction(node) || ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node))
+		return false;
 
-	if (type.getConstructSignatures()[0]?.parameters)
-		return true;
+	type ??= checker.getTypeAtLocation(node);
 
-	return false;
+	// If it doesn't have any call signatures, it's not even a function
+	if (!type.getCallSignatures().length)
+		return false;
+
+	// console.log(node.getText(), ts.SyntaxKind[node.kind]);
+
+	// if (!type.getConstructSignatures().length)
+	// 	return false;
+
+	return true;
+}
+
+export function ancestorCount(node: ts.Node, ancestorKind: ts.SyntaxKind) {
+	let count = 0;
+	while (node.parent) {
+		node = node.parent;
+		if (node.kind === ancestorKind)
+			count++;
+	}
+
+	return count;
 }
 
 export function asRef(value: string): string {
@@ -140,4 +162,12 @@ export function findProjectRoot(dir: string, fileToSearch = "package.json"): str
 export function callUtilFunction(functionName: keyof typeof utilFunctions, ...params: string[]) {
 	calledUtilFunctions.set(functionName, true);
 	return `${functionName}(${params.join(", ")})`;
+}
+
+export function printNodeAST(node: ts.Node, output: string[] = [], depth = 0, isRoot = true) {
+	const name = ts.isDeclarationStatement(node) || ts.isExpression(node) ? ts.getNameOfDeclaration(node)?.getText() ?? "" : "";
+	output.push(`${"| ".repeat(depth)}${ts.SyntaxKind[node.kind]} (${node.kind}) ${name}`);
+	node.forEachChild(child => printNodeAST(child, output, depth + 1, false));
+
+	if (isRoot) console.log(output.join("\n"));
 }

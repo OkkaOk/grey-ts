@@ -5,11 +5,18 @@ function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray
 	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
 	const body = node.body ? handleBlock(node.body, ctx) : "";
 
-	return `function(${params})\n\t${body}\nend function`;
+	return `function(${params})\n${body}\nend function`;
 }
 
 function handleBlock(node: ts.Block, ctx: TranspileContext): string {
-	return node.statements.map(val => handleNode(val, ctx)).join("\n\t");
+	const output = node.statements.map(val => {
+		let statement = handleNode(val, ctx);
+		statement = statement.split("\n").map(line => "\t" + line).join("\n");
+
+		return statement;
+	}).join("\n");
+
+	return output;
 }
 
 // Methods inside classes and objects
@@ -40,17 +47,17 @@ function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): str
 	// }
 
 	const params = node.parameters.map(param => handleNode(param, ctx));
-	const body = ts.isBlock(node.body) ? handleNode(node.body, ctx) : `return ${handleNode(node.body, ctx)}`;
+	const body = ts.isBlock(node.body) ? handleNode(node.body, ctx) : `\treturn ${handleNode(node.body, ctx)}`;
 
-	if (ts.isCallExpression(node.parent)) {
+	if (ts.isCallExpression(node.parent) || ts.isParenthesizedExpression(node.parent)) {
 		return "@" + createAnonFunction(body, params).name;
 	}
 
-	if (ts.isPropertyAssignment(node.parent) || ts.isVariableDeclaration(node.parent) || ts.isBinaryExpression(node.parent)) {
-		return `function(${params.join(", ")})\n\t${body}\nend function`;
+	if (ts.isPropertyAssignment(node.parent) || ts.isVariableDeclaration(node.parent) || ts.isBinaryExpression(node.parent) || ts.isReturnStatement(node.parent)) {
+		return `function(${params.join(", ")})\n${body}\nend function`;
 	}
 
-	const kind = ts.SyntaxKind[node.parent.kind]
+	const kind = ts.SyntaxKind[node.parent.kind];
 	throw `This kind of arrow function is not yet supported (parent: ${kind} (${node.parent.kind}))`;
 }
 

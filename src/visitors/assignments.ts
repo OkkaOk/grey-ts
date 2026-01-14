@@ -1,10 +1,10 @@
 import ts from "typescript";
 import { handleNode, type TranspileContext } from "../transpiler";
-import { asRef, nodeIsFunction } from "../utils";
+import { asRef, nodeIsFunctionReference } from "../utils";
 
 function handlePropertyAssignment(node: ts.PropertyAssignment, ctx: TranspileContext): string {
 	let right = handleNode(node.initializer, ctx);
-	if (nodeIsFunction(node.initializer))
+	if (nodeIsFunctionReference(node.initializer))
 		right = asRef(right);
 
 	if (ts.isNumericLiteral(node.name) || ts.isStringLiteral(node.name) || ts.isComputedPropertyName(node.name))
@@ -15,7 +15,7 @@ function handlePropertyAssignment(node: ts.PropertyAssignment, ctx: TranspileCon
 
 function handleShorthandPropertyAssignment(node: ts.ShorthandPropertyAssignment, ctx: TranspileContext): string {
 	const name = handleNode(node.name, ctx);
-	return `\"${name}\": ${nodeIsFunction(node.name) ? asRef(name) : name}`;
+	return `\"${name}\": ${nodeIsFunctionReference(node.name) ? asRef(name) : name}`;
 }
 
 function handleComputedPropertyName(node: ts.ComputedPropertyName, ctx: TranspileContext): string {

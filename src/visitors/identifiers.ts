@@ -1,15 +1,14 @@
 import ts from "typescript";
 import { checker, handleNode, type TranspileContext } from "../transpiler";
-import { asRef, nodeIsFunction, replaceIdentifier } from "../utils";
+import { asRef, nodeIsFunctionReference, replaceIdentifier } from "../utils";
 
 function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 	const type = checker.getTypeAtLocation(node);
+	if (type.flags === ts.TypeFlags.Undefined)
+		return "null"; // No undefined in greyscript
 
 	const original = node.text;
 	let name = node.text;
-
-	if (type.flags === ts.TypeFlags.Undefined)
-		return "null"; // No undefined in greyscript
 
 	if (type.isUnion()) {
 		for (const t of type.types) {
@@ -21,8 +20,15 @@ function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 		name = replaceIdentifier(node.text, type)
 	}
 
-	// Alternatively could check if the parent is a CallExpression or NewExpression
-	if (ctx.inFunctionCall && nodeIsFunction(node)) name = asRef(name);
+	if (ctx.namedImports[ctx.currentFilePath]?.[name]) {
+		name = ctx.namedImports[ctx.currentFilePath]![name]!;
+	}
+
+	if (ts.isCallOrNewExpression(node.parent) && node != node.parent.expression) {
+		// Is inside a call expression and is a function reference
+		if (nodeIsFunctionReference(node, type))
+			name = asRef(name);
+	}
 
 	return name;
 }
@@ -37,7 +43,7 @@ function handleParameter(node: ts.ParameterDeclaration, ctx: TranspileContext): 
 function createIdentifierHandlers() {
 	return {
 		[ts.SyntaxKind.NumericLiteral]: (node: ts.NumericLiteral) => node.text,
-		[ts.SyntaxKind.StringLiteral]: (node: ts.StringLiteral) => `"${node.text}"`,
+		[ts.SyntaxKind.StringLiteral]: (node: ts.StringLiteral) => `"${node.text.replaceAll('"', '\"\"')}"`,
 		[ts.SyntaxKind.Parameter]: handleParameter,
 		[ts.SyntaxKind.Identifier]: handleIdentifier,
 		[ts.SyntaxKind.SuperKeyword]: (node: ts.SuperExpression) => {

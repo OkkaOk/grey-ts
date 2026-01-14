@@ -32,7 +32,7 @@ function handleConstructor(node: ts.ConstructorDeclaration, ctx: TranspileContex
 	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
 	const body = node.body ? handleNode(node.body, ctx) : "";
 
-	return `constructor = function(${params})\n\t${body}\nreturn self\nend function`;
+	return `constructor = function(${params})\n${body}\n\treturn self\nend function`;
 }
 
 function handleGetAccessor(node: ts.GetAccessorDeclaration, ctx: TranspileContext): string {

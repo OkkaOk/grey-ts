@@ -1,20 +1,17 @@
 import ts from "typescript";
 import { handleNode, type TranspileContext } from "../transpiler";
-import { asRef, nodeIsFunction } from "../utils";
+import { asRef, nodeIsFunctionReference } from "../utils";
 
 function handleVariableDeclaration(
 	node: ts.VariableDeclaration | ts.PropertyDeclaration,
 	ctx: TranspileContext
 ): string {
 	let right = node.initializer ? (handleNode(node.initializer, ctx) || "null") : "null";
-	if (right != "null" && nodeIsFunction(node.initializer!)) {
+	if (right != "null" && nodeIsFunctionReference(node.initializer!)) {
 		right = asRef(right);
 	}
 
-	let left = handleNode(node.name, ctx);
-	if (nodeIsFunction(node.name))
-		left = asRef(left);
-
+	const left = handleNode(node.name, ctx);
 	return `${left} = ${right}`;
 }
 
