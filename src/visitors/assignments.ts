@@ -1,33 +1,23 @@
 import ts from "typescript";
-import { handleNode, type TranspileContext } from "../transpiler";
+import { NodeHandler } from "../transpiler";
 import { asRef, nodeIsFunctionReference } from "../utils";
 
-function handlePropertyAssignment(node: ts.PropertyAssignment, ctx: TranspileContext): string {
-	let right = handleNode(node.initializer, ctx);
+NodeHandler.register(ts.SyntaxKind.PropertyAssignment, (node: ts.PropertyAssignment) => {
+	let right = NodeHandler.handle(node.initializer);
 	if (nodeIsFunctionReference(node.initializer))
 		right = asRef(right);
 
 	if (ts.isNumericLiteral(node.name) || ts.isStringLiteral(node.name) || ts.isComputedPropertyName(node.name))
-		return `${handleNode(node.name, ctx)}: ${right}`;
+		return `${NodeHandler.handle(node.name)}: ${right}`;
 
-	return `\"${handleNode(node.name, ctx)}\": ${right}`;
-}
+	return `\"${NodeHandler.handle(node.name)}\": ${right}`;
+});
 
-function handleShorthandPropertyAssignment(node: ts.ShorthandPropertyAssignment, ctx: TranspileContext): string {
-	const name = handleNode(node.name, ctx);
+NodeHandler.register(ts.SyntaxKind.ShorthandPropertyAssignment, (node: ts.ShorthandPropertyAssignment) => {
+	const name = NodeHandler.handle(node.name);
 	return `\"${name}\": ${nodeIsFunctionReference(node.name) ? asRef(name) : name}`;
-}
+});
 
-function handleComputedPropertyName(node: ts.ComputedPropertyName, ctx: TranspileContext): string {
-	return handleNode(node.expression, ctx);
-}
-
-function createAssignmentHandlers() {
-	return {
-		[ts.SyntaxKind.PropertyAssignment]: handlePropertyAssignment,
-		[ts.SyntaxKind.ShorthandPropertyAssignment]: handleShorthandPropertyAssignment,
-		[ts.SyntaxKind.ComputedPropertyName]: handleComputedPropertyName,
-	};
-}
-
-export default createAssignmentHandlers;
+NodeHandler.register(ts.SyntaxKind.ComputedPropertyName, (node: ts.ComputedPropertyName) => {
+	return NodeHandler.handle(node.expression);
+});

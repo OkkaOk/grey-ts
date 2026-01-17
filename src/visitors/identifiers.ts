@@ -1,24 +1,24 @@
 import ts from "typescript";
-import { checker, handleNode, type TranspileContext } from "../transpiler";
+import { checker, NodeHandler } from "../transpiler";
 import { asRef, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
-function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
+NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
 	const type = checker.getTypeAtLocation(node);
-	
+
 	let name = node.text;
-	
+
 	if (name === "undefined")
 		return "null"; // No undefined in greyscript
-	
+
 	if (type.isUnion()) {
 		const original = node.text;
 		for (const t of type.types) {
-			name = replaceIdentifier(node.text, t)
-			if (name != original) break
+			name = replaceIdentifier(node.text, t);
+			if (name != original) break;
 		}
 	}
 	else {
-		name = replaceIdentifier(node.text, type)
+		name = replaceIdentifier(node.text, type);
 	}
 
 	if (ctx.namedImports[ctx.currentFilePath]?.[name]) {
@@ -32,31 +32,30 @@ function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 	}
 
 	return name;
-}
+});
 
-function handleParameter(node: ts.ParameterDeclaration, ctx: TranspileContext): string {
-	const name = handleNode(node.name, ctx);
+NodeHandler.register(ts.SyntaxKind.Parameter, (node: ts.ParameterDeclaration) => {
+	const name = NodeHandler.handle(node.name);
 	if (!node.initializer) return name;
 
-	return `${name} = ${handleNode(node.initializer, ctx)}`;
-}
+	return `${name} = ${NodeHandler.handle(node.initializer)}`;
+});
 
-function createIdentifierHandlers() {
-	return {
-		[ts.SyntaxKind.NumericLiteral]: (node: ts.NumericLiteral) => node.text,
-		[ts.SyntaxKind.StringLiteral]: (node: ts.StringLiteral) => `"${transformString(node.text)}"`,
-		[ts.SyntaxKind.Parameter]: handleParameter,
-		[ts.SyntaxKind.Identifier]: handleIdentifier,
-		[ts.SyntaxKind.SuperKeyword]: (node: ts.SuperExpression) => {
-			if (ts.isPropertyAccessExpression(node.parent)) return "super";
-			return "super.constructor";
-		},
-		[ts.SyntaxKind.ThisKeyword]: () => "self",
-		[ts.SyntaxKind.NullKeyword]: () => "null",
-		[ts.SyntaxKind.UndefinedKeyword]: () => "null",
-		[ts.SyntaxKind.FalseKeyword]: () => "0",
-		[ts.SyntaxKind.TrueKeyword]: () => "1",
-	};
-}
+NodeHandler.register(ts.SyntaxKind.NumericLiteral, (node: ts.NumericLiteral) => node.text);
+NodeHandler.register(ts.SyntaxKind.StringLiteral, (node: ts.StringLiteral) => `"${transformString(node.text)}"`);
+NodeHandler.register(ts.SyntaxKind.ThisKeyword, () => "self");
+NodeHandler.register(ts.SyntaxKind.NullKeyword, () => "null");
+NodeHandler.register(ts.SyntaxKind.UndefinedKeyword, () => "null");
+NodeHandler.register(ts.SyntaxKind.FalseKeyword, () => "0");
+NodeHandler.register(ts.SyntaxKind.TrueKeyword, () => "1");
 
-export default createIdentifierHandlers;
+NodeHandler.register(ts.SyntaxKind.SuperKeyword, (node: ts.SuperExpression) => {
+	if (ts.isPropertyAccessExpression(node.parent)) return "super";
+	return "super.constructor";
+});
+
+NodeHandler.register(ts.SyntaxKind.RegularExpressionLiteral, (node: ts.RegularExpressionLiteral) => {
+	const start = node.text.indexOf("/")! + 1;
+	const end = node.text.lastIndexOf("/")!;
+	return `"${node.text.slice(start, end)}"`;
+});

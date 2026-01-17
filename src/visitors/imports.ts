@@ -1,7 +1,6 @@
 import path from "node:path";
 import ts from "typescript";
-import { program, transpileSourceFile, type TranspileContext } from "../transpiler";
-
+import { NodeHandler, program, transpileSourceFile, type TranspileContext } from "../transpiler";
 
 function importFile(filePath: string, ctx: TranspileContext, returnResult?: boolean): string {
 	let srcPath = path.resolve(ctx.currentFolder, filePath);
@@ -22,7 +21,7 @@ function importFile(filePath: string, ctx: TranspileContext, returnResult?: bool
 // import d, * as ns from "mod" => name = d, namedBinding: NamespaceImport = { name: ns }
 // import { a, b as x } from "mod" => name = undefined, namedBinding: NamedImports = { elements: [{ name: a }, { name: x, propertyName: b}]}
 // import d, { a, b as x } from "mod" => name = d, namedBinding: NamedImports = { elements: [{ name: a }, { name: x, propertyName: b}]}
-function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileContext): string {
+NodeHandler.register(ts.SyntaxKind.ImportDeclaration, (node: ts.ImportDeclaration, ctx) => {
 	// e.g. import "mod"
 	// In normal TypeScript/JavaScript, the module would just be executed so we need to emulate that
 	if (!node.importClause) {
@@ -33,7 +32,7 @@ function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileConte
 
 		const rndName = "func_" + (Date.now() * Math.random()).toString().slice(0, 6);
 		return [
-			`${rndName} = function()`,
+			`${rndName} = function`,
 			transpiledFile.split("\n").map(line => "\t" + line).join("\n"),
 			"end function",
 			`${rndName}()`
@@ -65,12 +64,4 @@ function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileConte
 
 	const moduleSpecifier = (node.moduleSpecifier as ts.StringLiteral).text;
 	return importFile(moduleSpecifier, ctx);
-}
-
-function createImportHandlers() {
-	return {
-		[ts.SyntaxKind.ImportDeclaration]: handleImportDeclaration
-	};
-}
-
-export default createImportHandlers;
+});

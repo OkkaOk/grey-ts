@@ -129,8 +129,8 @@ export function replaceIdentifier(original: string, type: ts.Type, propertyName?
 
 	const symbolFullName = checker.getFullyQualifiedName(symbol);
 
-	// console.log(original, symbolFullName);
 	const replaceValue: string | undefined = apiNameMap[symbolFullName];
+	// console.log(original, symbolFullName, replaceValue);
 	if (!replaceValue)
 		return original;
 

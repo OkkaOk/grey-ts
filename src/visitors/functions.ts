@@ -1,34 +1,33 @@
 import ts from "typescript";
-import { createAnonFunction, handleNode, type TranspileContext } from "../transpiler";
+import { createAnonFunction, NodeHandler } from "../transpiler";
 
-function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration>; }, ctx: TranspileContext) {
-	const params = node.parameters.map(param => handleNode(param, ctx)).join(", ");
-	const body = node.body ? handleBlock(node.body, ctx) : "";
+function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration>; }) {
+	const params = node.parameters.map(param => NodeHandler.handle(param)).join(", ");
+	const body = node.body ? NodeHandler.handle(node.body) : "";
 
 	return `function(${params})\n${body}\nend function`;
 }
 
-function handleBlock(node: ts.Block, ctx: TranspileContext): string {
+NodeHandler.register(ts.SyntaxKind.Block, (node: ts.Block) => {
 	const output = node.statements.map(val => {
-		let statement = handleNode(val, ctx);
+		let statement = NodeHandler.handle(val);
 		statement = statement.split("\n").map(line => "\t" + line).join("\n");
 
 		return statement;
 	}).join("\n");
 
 	return output;
-}
+});
 
 // Methods inside classes and objects
-function handleMethodDeclaration(node: ts.MethodDeclaration, ctx: TranspileContext): string {
+NodeHandler.register(ts.SyntaxKind.MethodDeclaration, (node: ts.MethodDeclaration) => {
 	// if (ts.isObjectLiteralExpression(node.parent)) {
 
 	// }
-	// console.log(`P: ${ts.SyntaxKind[node.parent.kind]}`, node.name.getText())
-	return `${handleNode(node.name, ctx)} = ${transpileFunctionBody(node, ctx)}`;
-}
+	return `${NodeHandler.handle(node.name)} = ${transpileFunctionBody(node)}`;
+});
 
-function handleFunctionDeclaration(node: ts.FunctionDeclaration, ctx: TranspileContext): string {
+NodeHandler.register(ts.SyntaxKind.FunctionDeclaration, (node: ts.FunctionDeclaration,) => {
 	// TODO: confirm this
 	// Is a function overload.
 	if (!node.body)
@@ -38,12 +37,12 @@ function handleFunctionDeclaration(node: ts.FunctionDeclaration, ctx: TranspileC
 		return "";
 
 	const name = node.name ? node.name.text : "anon";
-	return `${name} = ${transpileFunctionBody(node, ctx)}`;
-}
+	return `${name} = ${transpileFunctionBody(node)}`;
+});
 
-function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): string {
-	const params = node.parameters.map(param => handleNode(param, ctx));
-	const body = ts.isBlock(node.body) ? handleNode(node.body, ctx) : `\treturn ${handleNode(node.body, ctx)}`;
+NodeHandler.register(ts.SyntaxKind.ArrowFunction, (node: ts.ArrowFunction) => {
+	const params = node.parameters.map(param => NodeHandler.handle(param));
+	const body = ts.isBlock(node.body) ? NodeHandler.handle(node.body) : `\treturn ${NodeHandler.handle(node.body)}`;
 
 	if (ts.isCallOrNewExpression(node.parent) || ts.isParenthesizedExpression(node.parent)) {
 		return "@" + createAnonFunction(body, params).name;
@@ -55,20 +54,8 @@ function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): str
 
 	const kind = ts.SyntaxKind[node.parent.kind];
 	throw `This kind of arrow function is not yet supported (parent: ${kind} (${node.parent.kind}))`;
-}
+});
 
-function handleFunctionExpression(node: ts.FunctionExpression, ctx: TranspileContext): string {
-	return transpileFunctionBody(node, ctx);
-}
-
-function createFunctionHandlers() {
-	return {
-		[ts.SyntaxKind.Block]: handleBlock,
-		[ts.SyntaxKind.MethodDeclaration]: handleMethodDeclaration,
-		[ts.SyntaxKind.FunctionDeclaration]: handleFunctionDeclaration,
-		[ts.SyntaxKind.ArrowFunction]: handleArrowFunction,
-		[ts.SyntaxKind.FunctionExpression]: handleFunctionExpression,
-	};
-}
-
-export default createFunctionHandlers;
+NodeHandler.register(ts.SyntaxKind.FunctionExpression, (node: ts.FunctionExpression) => {
+	return transpileFunctionBody(node);
+});

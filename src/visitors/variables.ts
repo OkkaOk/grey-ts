@@ -1,39 +1,35 @@
 import ts from "typescript";
-import { handleNode, type TranspileContext } from "../transpiler";
+import { checker, NodeHandler, type TranspileContext } from "../transpiler";
 import { asRef, nodeIsFunctionReference } from "../utils";
 
 function handleVariableDeclaration(
 	node: ts.VariableDeclaration | ts.PropertyDeclaration,
 	ctx: TranspileContext
 ): string {
-	let right = node.initializer ? (handleNode(node.initializer, ctx) || "null") : "null";
-	if (right != "null" && nodeIsFunctionReference(node.initializer!)) {
+	const left = NodeHandler.handle(node.name);
+	
+	const initializerType = node.initializer ? checker.getTypeAtLocation(node.initializer) : undefined;
+
+	if (ts.isPropertyDeclaration(node) && initializerType?.flags === ts.TypeFlags.Object) {
+		throw `You shouldn't initialize '${left}' with an Array or an Object because in GreyScript, every instantiation refers to the same addresses of those objects.\nInitialize them in the constructor instead`
+	}
+
+	let right = node.initializer ? (NodeHandler.handle(node.initializer) || "null") : "null";
+	if (right != "null" && nodeIsFunctionReference(node.initializer!, initializerType)) {
 		right = asRef(right);
 	}
 
-	const left = handleNode(node.name, ctx);
+	
 	return `${left} = ${right}`;
 }
 
-function handleVariableDeclarationList(node: ts.VariableDeclarationList, ctx: TranspileContext): string {
+NodeHandler.register(ts.SyntaxKind.VariableDeclarationList, (node: ts.VariableDeclarationList, ctx) => {
 	return node.declarations.map(decl => handleVariableDeclaration(decl, ctx)).join("\n");
-}
+})
 
-function handleVariableStatement(node: ts.VariableStatement, ctx: TranspileContext): string {
-	return handleVariableDeclarationList(node.declarationList, ctx);
-}
+NodeHandler.register(ts.SyntaxKind.VariableStatement, (node: ts.VariableStatement, ctx) => {
+	return NodeHandler.handle(node.declarationList);
+});
 
-function handlePropertyDeclaration(node: ts.PropertyDeclaration, ctx: TranspileContext): string {
-	return handleVariableDeclaration(node, ctx);
-}
-
-function createVariableHandlers() {
-	return {
-		[ts.SyntaxKind.VariableDeclaration]: handleVariableDeclaration,
-		[ts.SyntaxKind.VariableDeclarationList]: handleVariableDeclarationList,
-		[ts.SyntaxKind.VariableStatement]: handleVariableStatement,
-		[ts.SyntaxKind.PropertyDeclaration]: handlePropertyDeclaration,
-	};
-}
-
-export default createVariableHandlers;
+NodeHandler.register(ts.SyntaxKind.VariableDeclaration, handleVariableDeclaration);
+NodeHandler.register(ts.SyntaxKind.PropertyDeclaration, handleVariableDeclaration);

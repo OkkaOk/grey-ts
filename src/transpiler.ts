@@ -4,17 +4,6 @@ import ts from "typescript";
 
 import parseCode from "./parser.js";
 import { findProjectRoot } from "./utils.js";
-import createAssignmentHandlers from "./visitors/assignments.js";
-import createClassHandlers from "./visitors/classes.js";
-import createExpressionHandlers from "./visitors/expressions.js";
-import createFunctionHandlers from "./visitors/functions.js";
-import createIdentifierHandlers from "./visitors/identifiers.js";
-import createImportHandlers from "./visitors/imports.js";
-import createStatementHandlers from "./visitors/statements.js";
-import createVariableHandlers from "./visitors/variables.js";
-
-export let program: ts.Program;
-export let checker: ts.TypeChecker;
 
 type Mode = "ts" | "js";
 
@@ -29,38 +18,86 @@ export type TranspileContext = {
 	output: string[];
 };
 
-let handlers: Record<number, (node: ts.Node, ctx: TranspileContext) => string> = {};
+type HandlerType<T extends ts.Node> = (node: T, ctx: TranspileContext, ...extraArgs: any[]) => string;
+export class NodeHandler {
+	static handlers: Map<ts.SyntaxKind, HandlerType<any>> = new Map();
+	static transpileContext: TranspileContext;
 
-const anonFunctions = new Map<string, string>()
-export const calledUtilFunctions = new Map<keyof typeof utilFunctions, boolean>()
+	static register<T extends ts.Node>(kind: ts.SyntaxKind, handler: HandlerType<T>) {
+		if (this.handlers.has(kind))
+			throw `${ts.SyntaxKind[kind]} (${kind}) is already registered`;
+
+		this.handlers.set(kind, handler);
+	}
+
+	static handle(node: ts.Node): string {
+		const handler = this.handlers.get(node.kind);
+		if (!handler) {
+			console.log(`Unsupported syntax ${ts.SyntaxKind[node.kind]} (kind ${node.kind}) was not transpiled: ${node.getText()}`);
+			this.printLineAndCol(node);
+			return "null";
+		}
+
+		// console.log(ts.SyntaxKind[node.kind], node.kind, ts.isDeclarationStatement(node), node.getText());
+		try {
+			const result = handler(node, this.transpileContext);
+			return result;
+		} catch (error) {
+			console.error(error);
+
+			this.printLineAndCol(node);
+			return "null";
+		}
+	}
+
+	private static printLineAndCol(node: ts.Node) {
+		const source = node.getSourceFile();
+		const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
+		console.log(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character + 1}`);
+	}
+}
+
+NodeHandler.register(ts.SyntaxKind.TypeAliasDeclaration, () => "");
+NodeHandler.register(ts.SyntaxKind.InterfaceDeclaration, () => "");
+NodeHandler.register(ts.SyntaxKind.EndOfFileToken, () => "");
+
+export let program: ts.Program;
+export let checker: ts.TypeChecker;
+
+const anonFunctions = new Map<string, string>();
+export const calledUtilFunctions = new Map<keyof typeof utilFunctions, boolean>();
 export const utilFunctions = {
 	"get_property": [
 		"get_property = function(obj, key)",
+		"	if obj isa list and list.hasIndex(key) then return obj[key]",
+		"	if obj isa map and map.hasIndex(key) then return obj[key]",
+		"	if obj isa string and string.hasIndex(key) then return obj[key]",
+		"	if obj isa number and number.hasIndex(key) then return obj[key]",
 		"	if not obj then return null",
-		"	if obj isa list and list.hasIndex(key) then return obj[key]()",
-		"	if obj isa map and map.hasIndex(key) then return obj[key]()",
-		"	if obj isa string and string.hasIndex(key) then return obj[key]()",
-		"	if obj isa number and number.hasIndex(key) then return obj[key]()",
-		"	if (obj.hasIndex(key)) then return @obj[key]",
-		`	if (obj.hasIndex("__isa")) then return get_property(obj["__isa"], key)`,
+		"	if obj.hasIndex(key) then return @obj[key]",
+		"	isaobj = obj",
+		"	while isaobj.hasIndex(\"__isa\")",
+		"		isaobj = obj[\"__isa\"]",
+		"		if isaobj.hasIndex(key) then return obj[key]()",
+		"	end while",
 		"	return null",
 		"end function",
 	].join("\n"),
 	"assign_objects": [
 		"assign_objects = function(target, sources)",
 		"	for source in sources",
-		"		if (typeof(source) == \"list\") then",
-		"			if (typeof(target) == \"list\") then",
-		"				for i in range(0, source.len() - 1, 1)",
-		"					if (target.len() <= i) then target.push(null)",
+		"		if typeof(source) == \"list\" then",
+		"			if typeof(target) == \"list\" then",
+		"				for i in range(0, source.len - 1, 1)",
+		"					if target.len() <= i then target.push(null)",
 		"					target[i] = source[i]",
 		"				end for",
 		"			else",
-		"				for i in range(0, source.len() - 1, 1)",
+		"				for i in range(0, source.len - 1, 1)",
 		"					target[str(i)] = source[i]",
 		"				end for",
 		"			end if",
-		"		else if (typeof(source) == \"map\") then",
+		"		else if typeof(source) == \"map\" then",
 		"			for item in source",
 		"				target[item.key] = item.value",
 		"			end for",
@@ -85,7 +122,7 @@ export const utilFunctions = {
 		"	index = 0",
 		"	out = []",
 		"	for item in array",
-		"		if (predicate(item, index, array)) then out.push(item)",
+		"		if predicate(item, index, array) then out.push(item)",
 		"		index = index + 1",
 		"	end for",
 		"	return out",
@@ -95,7 +132,7 @@ export const utilFunctions = {
 		"array_find = function(array, predicate)",
 		"	index = 0",
 		"	for item in array",
-		"		if (predicate(item, index, array)) then return item",
+		"		if predicate(item, index, array) then return item",
 		"		index = index + 1",
 		"	end for",
 		"	return null",
@@ -105,7 +142,7 @@ export const utilFunctions = {
 		"array_some = function(array, predicate)",
 		"	index = 0",
 		"	for item in array",
-		"		if (predicate(item, index, array)) then return 1",
+		"		if predicate(item, index, array) then return 1",
 		"		index = index + 1",
 		"	end for",
 		"	return 0",
@@ -115,7 +152,7 @@ export const utilFunctions = {
 		"array_every = function(array, predicate)",
 		"	index = 0",
 		"	for item in array",
-		"		if (not predicate(item, index, array)) then return 0",
+		"		if not predicate(item, index, array) then return 0",
 		"		index = index + 1",
 		"	end for",
 		"	return 1",
@@ -139,31 +176,11 @@ export const utilFunctions = {
 		"	return curr_max",
 		"end function"
 	].join("\n"),
-	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif (left == null) then return @right\n\treturn @left\nend function",
-	"or_op": "or_op = function(left, right)\n\tif (not left) then return @right\n\treturn @left\nend function",
+	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif left == null then return @right\n\treturn @left\nend function",
+	"or_op": "or_op = function(left, right)\n\tif not left then return @right\n\treturn @left\nend function",
 	"is_type": "is_type = function(value, type)\n\tif typeof(value) == type then return 1\n\treturn 0\nend function",
 	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return when_true\n\treturn when_false\nend function",
-}
-
-function createHandlers() {
-	const result: typeof handlers = {};
-
-	Object.assign(result, createClassHandlers());
-	Object.assign(result, createExpressionHandlers());
-	Object.assign(result, createFunctionHandlers());
-	Object.assign(result, createIdentifierHandlers());
-	Object.assign(result, createImportHandlers());
-	Object.assign(result, createStatementHandlers());
-	Object.assign(result, createVariableHandlers());
-	Object.assign(result, createAssignmentHandlers());
-
-	// ignored ones
-	result[ts.SyntaxKind.TypeAliasDeclaration] = () => "";
-	result[ts.SyntaxKind.InterfaceDeclaration] = () => "";
-	result[ts.SyntaxKind.EndOfFileToken] = () => "";
-
-	return result;
-}
+};
 
 export function createAnonFunction(body: string, params: string[]) {
 	const defaultParams = new Array(3).fill(0).map((_, i) => `param${i}`);
@@ -175,30 +192,6 @@ export function createAnonFunction(body: string, params: string[]) {
 	anonFunctions.set(nextName, result);
 
 	return { name: nextName, str: result };
-}
-
-export function handleNode(node: ts.Node, ctx: TranspileContext) {
-	// console.log(ts.SyntaxKind[node.kind], node.kind, ts.isDeclarationStatement(node), node.getText());
-	try {
-		const handler = handlers[node.kind];
-		if (handler) {
-			const result = handler(node, ctx);
-			return result;
-		};
-	} catch (error) {
-		console.error(error);
-
-		const source = node.getSourceFile();
-		const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
-		console.error(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character + 1}`);
-		return ts.isSourceFile(node.parent) ? "" : "null";
-	}
-
-	const source = node.getSourceFile();
-	const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
-	console.log(`Unsupported syntax ${ts.SyntaxKind[node.kind]} (kind ${node.kind}) was not transpiled: ${node.getText()}`);
-	console.log(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character + 1}`);
-	return "";
 }
 
 // type TranspileOptions = {
@@ -215,6 +208,8 @@ export function transpileString(typescriptString: string) {
 		output: [],
 	};
 
+	NodeHandler.transpileContext = ctx;
+
 	const sourceFile = parseCode("file.ts", typescriptString);
 
 	program = ts.createProgram({
@@ -228,7 +223,6 @@ export function transpileString(typescriptString: string) {
 	});
 
 	checker = program.getTypeChecker();
-	handlers = createHandlers();
 
 	transpileSourceFile(sourceFile, ctx);
 
@@ -256,6 +250,8 @@ export function transpileProgram(entryFileRelativePath: string) {
 		visitedFiles: {},
 		output: [],
 	};
+
+	NodeHandler.transpileContext = ctx;
 
 	ctx.currentFolder = path.dirname(ctx.currentFilePath);
 
@@ -287,7 +283,6 @@ export function transpileProgram(entryFileRelativePath: string) {
 	start = Date.now();
 
 	checker = program.getTypeChecker();
-	handlers = createHandlers();
 
 	const entry = program.getSourceFile(ctx.currentFilePath);
 	if (!entry) {
@@ -307,13 +302,14 @@ export function transpileProgram(entryFileRelativePath: string) {
 	if (anonFunctions.size) {
 		for (const declaration of anonFunctions.values())
 			ctx.output.unshift(declaration);
+		anonFunctions.clear();
 	}
 
 	if (calledUtilFunctions.size) {
 		for (const call of calledUtilFunctions.keys())
 			ctx.output.unshift(utilFunctions[call]);
+		calledUtilFunctions.clear();
 	}
-
 
 	console.log(`Transpiling took ${Date.now() - start} ms`);
 
@@ -344,11 +340,11 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 	const output: string[] = [];
 
 	sourceFile.forEachChild((node) => {
-		const result = handleNode(node, ctx);
-		if (!result) return
+		const result = NodeHandler.handle(node);
+		if (!result) return;
 
 		if (!returnResult)
-			ctx.output.push(result)
+			ctx.output.push(result);
 		else
 			output.push(result);
 	});

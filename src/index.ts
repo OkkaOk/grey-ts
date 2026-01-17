@@ -4,6 +4,15 @@ import * as fs from "node:fs";
 import path from "node:path";
 import { transpileProgram } from "./transpiler.js";
 import { findProjectRoot } from "./utils.js";
+import "./visitors/assignments.js";
+import "./visitors/classes.js";
+import "./visitors/expressions.js";
+import "./visitors/functions.js";
+import "./visitors/identifiers.js";
+import "./visitors/imports.js";
+import "./visitors/objects.js";
+import "./visitors/statements.js";
+import "./visitors/variables.js";
 
 let noMoreFlags = false;
 let command = "";

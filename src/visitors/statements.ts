@@ -1,15 +1,15 @@
 import ts from "typescript";
-import { handleNode, type TranspileContext } from "../transpiler";
+import { NodeHandler } from "../transpiler";
 
-function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): string {
+NodeHandler.register(ts.SyntaxKind.ForStatement, (node: ts.ForStatement) => {
 	if (!node.condition || !node.initializer || !node.incrementor) {
 		throw "Can't transpile this type of for loop.";
 	}
 
-	const initializer = handleNode(node.initializer, ctx);
-	const condition = handleNode(node.condition, ctx);
-	const incrementor = handleNode(node.incrementor, ctx);
-	const statement = handleNode(node.statement, ctx);
+	const initializer = NodeHandler.handle(node.initializer);
+	const condition = NodeHandler.handle(node.condition);
+	const incrementor = NodeHandler.handle(node.incrementor);
+	const statement = NodeHandler.handle(node.statement);
 
 	function hasContinue(n: ts.Node): boolean {
 		if (n.getChildren().some(child => {
@@ -26,7 +26,7 @@ function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): strin
 	if (!hasContinue(node)) {
 		return [
 			`${initializer}`,
-			`while (${condition})`,
+			`while ${condition}`,
 			`	${statement.trimStart()}`,
 			`	${incrementor}`,
 			`end while`
@@ -38,10 +38,10 @@ function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): strin
 	const output = [
 		`${incrementedStateVarName} = 1`,
 		`${initializer}`,
-		`while (${condition})`,
-		`	if (not ${incrementedStateVarName}) then`,
+		`while ${condition}`,
+		`	if not ${incrementedStateVarName} then`,
 		`		${incrementor}`,
-		`		if (not ${condition}) then break`,
+		`		if not ${condition} then break`,
 		`	end if`,
 		`	${incrementedStateVarName} = 0`,
 		`	${statement.trimStart()}`,
@@ -49,72 +49,107 @@ function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): strin
 		`	${incrementedStateVarName} = 1`,
 		`end while`,
 	].join("\n");
-	
+
 	return output;
-}
+});
 
-function handleForOfStatement(node: ts.ForOfStatement, ctx: TranspileContext): string {
-	const varName = handleNode((node.initializer as ts.VariableDeclarationList).declarations[0]!.name, ctx);
-	const objToLoop = handleNode(node.expression, ctx);
+NodeHandler.register(ts.SyntaxKind.ForOfStatement, (node: ts.ForOfStatement) => {
+	if (!ts.isVariableDeclarationList(node.initializer)) {
+		throw `Can't handle this 'for of' statement as '${NodeHandler.handle(node.initializer)}' is not initialized there`
+	}
 
-	return `for ${varName} in ${objToLoop}\n${handleNode(node.statement, ctx)}\nend for`;
-}
+	if (node.initializer.declarations.length > 1) {
+		throw "Can't have more than 1 variable declarations in a 'for of' statement"
+	}
 
-function handleForInStatement(node: ts.ForInStatement, ctx: TranspileContext): string {
-	const varName = handleNode((node.initializer as ts.VariableDeclarationList).declarations[0]!.name, ctx);
-	const objToLoop = handleNode(node.expression, ctx);
+	const varName = NodeHandler.handle(node.initializer.declarations[0]!.name);
+	const objToLoop = NodeHandler.handle(node.expression);
 
-	return `for ${varName} in ${objToLoop}.indexes()\n${handleNode(node.statement, ctx)}\nend for`;
-}
+	return `for ${varName} in ${objToLoop}\n${NodeHandler.handle(node.statement)}\nend for`;
+});
 
-function handleIfStatement(node: ts.IfStatement, ctx: TranspileContext): string {
-	const condition = handleNode(node.expression, ctx);
-	const thenStatement = handleNode(node.thenStatement, ctx);
+NodeHandler.register(ts.SyntaxKind.ForInStatement, (node: ts.ForInStatement) => {
+	if (!ts.isVariableDeclarationList(node.initializer)) {
+		throw `Can't handle this 'for in' statement as '${NodeHandler.handle(node.initializer)}' is not initialized there`;
+	}
+
+	if (node.initializer.declarations.length > 1) {
+		throw "Can't have more than 1 variable declarations in a 'for in' statement"
+	}
+
+	const varName = NodeHandler.handle(node.initializer.declarations[0]!.name);
+	const objToLoop = NodeHandler.handle(node.expression);
+
+	return `for ${varName} in ${objToLoop}.indexes\n${NodeHandler.handle(node.statement)}\nend for`;
+});
+
+NodeHandler.register(ts.SyntaxKind.IfStatement, (node: ts.IfStatement) => {
+	const condition = NodeHandler.handle(node.expression);
+	const thenStatement = NodeHandler.handle(node.thenStatement);
 
 	if (!ts.isBlock(node.thenStatement) && !ts.isIfStatement(node.thenStatement) && !node.elseStatement && !ts.isIfStatement(node.parent))
-		return `if (${condition}) then ${thenStatement}`;
+		return `if ${condition} then ${thenStatement}`;
 
-	let output = `if (${condition}) then\n${thenStatement}`;
+	let output = `if ${condition} then\n${thenStatement}`;
 
 	if (node.elseStatement) {
 		if (ts.isIfStatement(node.elseStatement)) {
-			output += `\nelse ${handleIfStatement(node.elseStatement, ctx)}`;
+			output += `\nelse ${NodeHandler.handle(node.elseStatement)}`;
 			return output;
 		}
 		else {
-			output += `\nelse\n${handleNode(node.elseStatement, ctx)}`;
+			output += `\nelse\n${NodeHandler.handle(node.elseStatement)}`;
 		}
 	}
 
 	output += "\nend if";
 
 	return output;
-}
+});
 
-function handleWhileStatement(node: ts.WhileStatement, ctx: TranspileContext): string {
-	const expression = handleNode(node.expression, ctx);
+NodeHandler.register(ts.SyntaxKind.WhileStatement, (node: ts.WhileStatement, ctx) => {
+	const expression = NodeHandler.handle(node.expression);
 
-	return `while ${expression}\n${handleNode(node.statement, ctx)}\nend while`;
-}
+	return [
+		`while ${expression}`,
+		`	${NodeHandler.handle(node.statement).trimStart()}`,
+		`end while`
+	].join("\n");
+});
 
-function handleDoStatement(node: ts.DoStatement, ctx: TranspileContext): string {
-	const expression = handleNode(node.expression, ctx);
+NodeHandler.register(ts.SyntaxKind.DoStatement, (node: ts.DoStatement, ctx) => {
+	const expression = NodeHandler.handle(node.expression);
 
-	return `did_once = 0\nwhile not did_once or ${expression}\ndid_once = 1\n${handleNode(node.statement, ctx)}\nend while`;
-}
+	return [
+		`did_once = 0`,
+		`while not did_once or ${expression}`,
+		`	did_once = 1`,
+		`	${NodeHandler.handle(node.statement).trimStart()}`,
+		`end while`
+	].join("\n");
+});
 
-function createStatementHandlers() {
-	return {
-		[ts.SyntaxKind.ForStatement]: handleForStatement,
-		[ts.SyntaxKind.ForOfStatement]: handleForOfStatement,
-		[ts.SyntaxKind.ForInStatement]: handleForInStatement,
-		[ts.SyntaxKind.IfStatement]: handleIfStatement,
-		[ts.SyntaxKind.ContinueStatement]: (_node: ts.ContinueStatement) => "continue",
-		[ts.SyntaxKind.BreakStatement]: (_node: ts.BreakStatement) => "break",
-		[ts.SyntaxKind.WhileStatement]: handleWhileStatement,
-		[ts.SyntaxKind.DoStatement]: handleDoStatement,
-		// TODO: switch statement, maybe trycatch and throw somehow
-	};
-}
+NodeHandler.register(ts.SyntaxKind.ContinueStatement, (node: ts.ContinueStatement) => {
+	return "continue";
+});
 
-export default createStatementHandlers;
+NodeHandler.register(ts.SyntaxKind.BreakStatement, (node: ts.BreakStatement) => {
+	return "break";
+});
+
+NodeHandler.register(ts.SyntaxKind.ReturnStatement, (node: ts.ReturnStatement) => {
+	if (!node.expression) {
+		// We're inside a constructor, but not inside an inner function
+		if (ts.findAncestor(node, (n) => ts.isConstructorDeclaration(n)) &&
+			!ts.findAncestor(node, n => ts.isFunctionLike(n))
+		) {
+			return "return self";
+		}
+
+		return "return";
+	}
+
+	return `return ${NodeHandler.handle(node.expression)}`;
+});
+
+// TODO: switch statement, maybe trycatch and throw somehow
