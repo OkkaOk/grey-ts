@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
 import { calledUtilFunctions, checker, handleNode, transpileSourceFile, type TranspileContext } from "../transpiler";
-import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess } from "../utils";
+import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess, transformString } from "../utils";
 
 const assignmentOperators = new Set<string>([
 	"=", "??=", "||=", "-=", "+="
@@ -111,11 +111,13 @@ function handleCallExpression(node: ts.CallExpression, ctx: TranspileContext): s
 	const type = checker.getTypeAtLocation(node.expression);
 	let symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
 
-	// if (!symbolFullName || symbolFullName.startsWith("__")) {
-	// 	const symbol = checker.getSymbolAtLocation(node.expression);
-	// 	symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
-	// }
-
+	// Without this for example Math.max would have "__type" as symbolFullName
+	// And with only this it would omit the "GreyHack." from symbolFullName
+	if (!symbolFullName || symbolFullName.startsWith("__")) {
+		const symbol = checker.getSymbolAtLocation(node.expression);
+		symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
+	}
+	
 	// TODO: more modular system than this...
 	if (symbolFullName === "Array.concat") {
 		const dotI = name.lastIndexOf(".");
@@ -151,11 +153,11 @@ function handleCallExpression(node: ts.CallExpression, ctx: TranspileContext): s
 
 	if (symbolFullName === "GreyHack.include") {
 		if (!node.arguments.length) return "";
-		if (args[0]!.charAt(0) === "\"") {
-			args[0] = args[0]!.slice(1, -1);
-		}
+		const fileArg = node.arguments[0]!;
+		if (!ts.isStringLiteralLike(fileArg))
+			throw "You can't include variables";
 
-		const absPath = path.resolve(ctx.currentFolder, args[0]!);
+		const absPath = path.resolve(ctx.currentFolder, fileArg.text);
 		const sources = getSourceFiles(absPath);
 
 		for (const source of sources) {
@@ -202,7 +204,7 @@ function handleNewExpression(node: ts.NewExpression, ctx: TranspileContext): str
 
 function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext): string {
 	// console.log(ts.SyntaxKind[node.parent.kind], node.getText())
-	const operatorToken = getOperatorToken(node.operatorToken) || node.operatorToken.getText();
+	let operatorToken = getOperatorToken(node.operatorToken) || node.operatorToken.getText();
 
 	// Chained assignment are not a thing in GreyScript/MiniScript.
 	// TODO: Maybe figure out an alternative way or keep as is
@@ -267,6 +269,9 @@ function handleBinaryExpression(node: ts.BinaryExpression, ctx: TranspileContext
 	// console.log(checker.getTypeAtLocation(node.right).flags, ts.TypeFlags.Undefined)
 	if (operatorToken == "+=" || operatorToken == "-=")
 		return `${left} = ${left} ${operatorToken[0]} ${right}`;
+
+	if (operatorToken === "**")
+		operatorToken = "^";
 
 	return `${left} ${operatorToken} ${right}`;
 }
@@ -404,7 +409,7 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 			continue;
 		}
 
-		if (ts.isPropertyAssignment(item) && (ts.isFunctionExpression(item.initializer) || ts.isArrowFunction(item.initializer))) {
+		if (ts.isPropertyAssignment(item) && ts.isFunctionLike(item.initializer)) {
 			if (!objectName)
 				throw "You can't have method declarations inside an object that is not being assigned to a variable";
 			funcs.push(`${objectName}.${handleNode(item.name, ctx)} = ${handleNode(item.initializer, ctx)}`);
@@ -463,7 +468,7 @@ function handleTemplateExpression(node: ts.TemplateExpression, ctx: TranspileCon
 }
 
 function handleTemplateHead(node: ts.TemplateHead): string {
-	return node.text.replaceAll('"', '\"\"');
+	return transformString(node.text);
 }
 
 function handleTemplateSpan(node: ts.TemplateSpan, ctx: TranspileContext): string {
@@ -474,7 +479,7 @@ function handleTemplateSpan(node: ts.TemplateSpan, ctx: TranspileContext): strin
 		output = `str(${output})`;
 
 	// The literal is the text after the expression. Is an empty string if a new TemplateSpan is right after like this ${first}${second}
-	if (node.literal.text) output += ` + "${node.literal.text.replaceAll('"', '\"\"')}"`;
+	if (node.literal.text) output += ` + "${transformString(node.literal.text)}"`;
 	return output;
 }
 
@@ -501,7 +506,7 @@ function createExpressionHandlers() {
 			if (!node.expression) {
 				// We're inside a constructor, but not inside an inner function
 				if (ts.findAncestor(node, (n) => ts.isConstructorDeclaration(n)) && 
-					!ts.findAncestor(node, n => ts.isFunctionDeclaration(n) || ts.isArrowFunction(n) || ts.isFunctionExpression(n))
+					!ts.findAncestor(node, n => ts.isFunctionLike(n))
 				) {
 					return "return self";
 				}
@@ -521,7 +526,7 @@ function createExpressionHandlers() {
 		[ts.SyntaxKind.TemplateExpression]: handleTemplateExpression,
 		[ts.SyntaxKind.TemplateHead]: handleTemplateHead,
 		[ts.SyntaxKind.TemplateSpan]: handleTemplateSpan,
-		[ts.SyntaxKind.NoSubstitutionTemplateLiteral]: (node: ts.Identifier) => `"${node.text.replaceAll('"', '\"\"')}"`,
+		[ts.SyntaxKind.NoSubstitutionTemplateLiteral]: (node: ts.Identifier) => `"${transformString(node.text)}"`,
 		[ts.SyntaxKind.AsExpression]: (node: ts.AsExpression, ctx: TranspileContext) => handleNode(node.expression, ctx),
 		[ts.SyntaxKind.ConditionalExpression]: handleConditionalExpression,
 		[ts.SyntaxKind.DeleteExpression]: (node: ts.DeleteExpression, ctx: TranspileContext) => {

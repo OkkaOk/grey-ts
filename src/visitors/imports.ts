@@ -1,13 +1,13 @@
 import path from "node:path";
 import ts from "typescript";
-import { transpileSourceFile, type TranspileContext } from "../transpiler";
+import { program, transpileSourceFile, type TranspileContext } from "../transpiler";
 
 
 function importFile(filePath: string, ctx: TranspileContext, returnResult?: boolean): string {
 	let srcPath = path.resolve(ctx.currentFolder, filePath);
 	if (!path.extname(srcPath)) srcPath += ".ts";
 	
-	const source = ctx.sources.find(s => s.fileName === srcPath);
+	const source = program.getSourceFile(srcPath)
 	if (!source) {
 		console.error(`Failed to find source ${srcPath}`);
 		return ""
@@ -28,6 +28,9 @@ function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileConte
 	if (!node.importClause) {
 		const moduleName = (node.moduleSpecifier as ts.StringLiteral).text;
 		const transpiledFile = importFile(moduleName, ctx, true);
+		if (!transpiledFile)
+			return "";
+
 		const rndName = "func_" + (Date.now() * Math.random()).toString().slice(0, 6);
 		return [
 			`${rndName} = function()`,
@@ -59,10 +62,6 @@ function handleImportDeclaration(node: ts.ImportDeclaration, ctx: TranspileConte
 			})
 		}
 	}
-
-	// const namedImports = node.importClause?.namedBindings;
-	// if (namedImports && ts.isNamedImports(namedImports))
-	// 	console.log(namedImports.elements);
 
 	const moduleSpecifier = (node.moduleSpecifier as ts.StringLiteral).text;
 	return importFile(moduleSpecifier, ctx);

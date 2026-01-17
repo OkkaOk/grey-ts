@@ -1,16 +1,17 @@
 import ts from "typescript";
 import { checker, handleNode, type TranspileContext } from "../transpiler";
-import { asRef, nodeIsFunctionReference, replaceIdentifier } from "../utils";
+import { asRef, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
 function handleIdentifier(node: ts.Identifier, ctx: TranspileContext): string {
 	const type = checker.getTypeAtLocation(node);
-	if (type.flags === ts.TypeFlags.Undefined)
-		return "null"; // No undefined in greyscript
-
-	const original = node.text;
+	
 	let name = node.text;
-
+	
+	if (name === "undefined")
+		return "null"; // No undefined in greyscript
+	
 	if (type.isUnion()) {
+		const original = node.text;
 		for (const t of type.types) {
 			name = replaceIdentifier(node.text, t)
 			if (name != original) break
@@ -43,7 +44,7 @@ function handleParameter(node: ts.ParameterDeclaration, ctx: TranspileContext): 
 function createIdentifierHandlers() {
 	return {
 		[ts.SyntaxKind.NumericLiteral]: (node: ts.NumericLiteral) => node.text,
-		[ts.SyntaxKind.StringLiteral]: (node: ts.StringLiteral) => `"${node.text.replaceAll('"', '\"\"')}"`,
+		[ts.SyntaxKind.StringLiteral]: (node: ts.StringLiteral) => `"${transformString(node.text)}"`,
 		[ts.SyntaxKind.Parameter]: handleParameter,
 		[ts.SyntaxKind.Identifier]: handleIdentifier,
 		[ts.SyntaxKind.SuperKeyword]: (node: ts.SuperExpression) => {
@@ -52,6 +53,7 @@ function createIdentifierHandlers() {
 		},
 		[ts.SyntaxKind.ThisKeyword]: () => "self",
 		[ts.SyntaxKind.NullKeyword]: () => "null",
+		[ts.SyntaxKind.UndefinedKeyword]: () => "null",
 		[ts.SyntaxKind.FalseKeyword]: () => "0",
 		[ts.SyntaxKind.TrueKeyword]: () => "1",
 	};

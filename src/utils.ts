@@ -19,13 +19,19 @@ export function getOperatorToken(node: ts.Node) {
 	if (!knownOperators.has(operatorToken))
 		throw `Can't handle operator '${operatorToken}' yet`;
 
-	if (operatorToken == "**") operatorToken = "^";
-	else if (operatorToken == "||") operatorToken = "or";
+	if (operatorToken == "||") operatorToken = "or";
 	else if (operatorToken == "&&") operatorToken = "and";
 	else if (operatorToken == "===") operatorToken = "==";
 	else if (operatorToken == "!==") operatorToken = "!=";
 
 	return operatorToken;
+}
+
+export function transformString(value: string): string {
+	value = value
+		.replaceAll('"', '\"\"')
+		.replaceAll("\n", `" + char(10) + "`); // Replacing with \\n messes with shell.build
+	return value;
 }
 
 export function nodeIsFunctionReference(node: ts.Node, type?: ts.Type) {
@@ -34,7 +40,7 @@ export function nodeIsFunctionReference(node: ts.Node, type?: ts.Type) {
 		return false;
 
 	// Declaring a function, not referencing
-	if (ts.isArrowFunction(node) || ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node))
+	if (ts.isFunctionLike(node))
 		return false;
 
 	type ??= checker.getTypeAtLocation(node);

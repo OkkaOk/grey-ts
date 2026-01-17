@@ -1,17 +1,35 @@
-import { expect, test } from "bun:test";
-import path from "node:path";
-import { describe } from "node:test";
-import { transpileString } from "../src/transpiler";
+import { describe, expect, test } from "bun:test";
+import { transpileString, utilFunctions } from "../src/transpiler";
 
-const rootDir = path.resolve(__dirname, "..");
-
-describe("Replace Identifiers", () => {
+describe("Identifiers", () => {
 	test("hostComputer", () => {
 		expect(
 			transpileString("const shell = getShell().hostComputer")
 		).toEqual("shell = get_shell().host_computer");
 	});
+});
 
+describe("Shims", () => {
+	test("Math.max", () => {
+		expect(
+			transpileString("const myMax = Math.max(6, 2, 8, 3)")
+		).toEqual(`${utilFunctions.math_max}\nmyMax = math_max([6,2,8,3])`);
+	});
+
+	test("Math.min", () => {
+		expect(
+			transpileString("const myMin = Math.min(6, 2, 8, 3)")
+		).toEqual(`${utilFunctions.math_min}\nmyMin = math_min([6,2,8,3])`);
+	});
+
+	test("Array.concat", () => {
+		expect(
+			transpileString("const myArr = [1,2,3].concat([4,5,6])")
+		).toEqual(`myArr = [1,2,3] + [4,5,6]`);
+	});
+});
+
+describe("Functions", () => {
 	test("userInput", () => {
 		expect(
 			transpileString(`

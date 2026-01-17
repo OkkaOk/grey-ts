@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import ts, { type SourceFile } from "typescript";
+import ts from "typescript";
 
 import parseCode from "./parser.js";
 import { findProjectRoot } from "./utils.js";
@@ -27,7 +27,6 @@ export type TranspileContext = {
 	mode?: Mode;
 	visitedFiles: Record<string, boolean>;
 	output: string[];
-	sources: SourceFile[];
 };
 
 let handlers: Record<number, (node: ts.Node, ctx: TranspileContext) => string> = {};
@@ -51,10 +50,16 @@ export const utilFunctions = {
 		"assign_objects = function(target, sources)",
 		"	for source in sources",
 		"		if (typeof(source) == \"list\") then",
-		"			if (typeof(target) == \"list\" and not target.len() and source.len()) then target.push(null)",
-		"			for i in range(0, source.len() - 1, 1)",
-		"				target[str(i)] = source[i]",
-		"			end for",
+		"			if (typeof(target) == \"list\") then",
+		"				for i in range(0, source.len() - 1, 1)",
+		"					if (target.len() <= i) then target.push(null)",
+		"					target[i] = source[i]",
+		"				end for",
+		"			else",
+		"				for i in range(0, source.len() - 1, 1)",
+		"					target[str(i)] = source[i]",
+		"				end for",
+		"			end if",
 		"		else if (typeof(source) == \"map\") then",
 		"			for item in source",
 		"				target[item.key] = item.value",
@@ -172,19 +177,12 @@ export function createAnonFunction(body: string, params: string[]) {
 	return { name: nextName, str: result };
 }
 
-const handleTimes: Record<string, number> = {}
 export function handleNode(node: ts.Node, ctx: TranspileContext) {
-	// console.log(ts.SyntaxKind[node.kind], node.kind, node.getText());
-	// const start = performance.now()
+	// console.log(ts.SyntaxKind[node.kind], node.kind, ts.isDeclarationStatement(node), node.getText());
 	try {
 		const handler = handlers[node.kind];
 		if (handler) {
 			const result = handler(node, ctx);
-
-			// const kind = ts.SyntaxKind[node.kind];
-			// handleTimes[kind] ??= 0;
-			// handleTimes[kind] += performance.now() - start;
-
 			return result;
 		};
 	} catch (error) {
@@ -214,7 +212,6 @@ export function transpileString(typescriptString: string) {
 		namedImports: {},
 		namespaceImports: {},
 		visitedFiles: {},
-		sources: [],
 		output: [],
 	};
 
@@ -238,11 +235,13 @@ export function transpileString(typescriptString: string) {
 	if (anonFunctions.size) {
 		for (const declaration of anonFunctions.values())
 			ctx.output.unshift(declaration);
+		anonFunctions.clear();
 	}
 
 	if (calledUtilFunctions.size) {
 		for (const call of calledUtilFunctions.keys())
 			ctx.output.unshift(utilFunctions[call]);
+		calledUtilFunctions.clear();
 	}
 
 	return ctx.output.join("\n");
@@ -255,7 +254,6 @@ export function transpileProgram(entryFileRelativePath: string) {
 		namedImports: {},
 		namespaceImports: {},
 		visitedFiles: {},
-		sources: [],
 		output: [],
 	};
 
@@ -291,17 +289,7 @@ export function transpileProgram(entryFileRelativePath: string) {
 	checker = program.getTypeChecker();
 	handlers = createHandlers();
 
-	ctx.sources = program.getSourceFiles().filter(source => {
-		if (source.isDeclarationFile)
-			return false;
-		if (program.isSourceFileDefaultLibrary(source))
-			return false;
-		if (program.isSourceFileFromExternalLibrary(source))
-			return false;
-		return true;
-	});
-
-	const entry = ctx.sources.find(s => s.fileName === ctx.currentFilePath);
+	const entry = program.getSourceFile(ctx.currentFilePath);
 	if (!entry) {
 		console.error(`Error: failed to find '${ctx.currentFilePath}' from the included sources`);
 		process.exit(1);
@@ -309,8 +297,6 @@ export function transpileProgram(entryFileRelativePath: string) {
 
 	// Todo: Maybe use worker threads if it takes too long to transpile
 	transpileSourceFile(entry, ctx);
-
-	// console.log(handleTimes)
 
 	// const output: string[] = [];
 	// for (const source of sources) {
@@ -338,6 +324,12 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 	if (ctx.visitedFiles[sourceFile.fileName])
 		return "";
 
+	if (sourceFile.isDeclarationFile)
+		return "";
+
+	if (program.isSourceFileDefaultLibrary(sourceFile) || program.isSourceFileFromExternalLibrary(sourceFile))
+		return "";
+
 	ctx.visitedFiles[sourceFile.fileName] = true;
 
 	const prevFile = ctx.currentFilePath;
@@ -353,12 +345,12 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 
 	sourceFile.forEachChild((node) => {
 		const result = handleNode(node, ctx);
-		if (result) {
-			if (!returnResult)
-				ctx.output.push(result)
-			else
-				output.push(result);
-		}
+		if (!result) return
+
+		if (!returnResult)
+			ctx.output.push(result)
+		else
+			output.push(result);
 	});
 
 	ctx.currentFilePath = prevFile;
@@ -367,4 +359,3 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 	console.log(`Transpiled ${path.basename(sourceFile.fileName)}`);
 	return output.join("\n");
 }
-

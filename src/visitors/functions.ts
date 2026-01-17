@@ -42,14 +42,10 @@ function handleFunctionDeclaration(node: ts.FunctionDeclaration, ctx: TranspileC
 }
 
 function handleArrowFunction(node: ts.ArrowFunction, ctx: TranspileContext): string {
-	// if (ts.isBinaryExpression(node.parent) && !Object.is(node.parent.right, node)) {
-	// 	throw "Inline arrow functions are not supported.";
-	// }
-
 	const params = node.parameters.map(param => handleNode(param, ctx));
 	const body = ts.isBlock(node.body) ? handleNode(node.body, ctx) : `\treturn ${handleNode(node.body, ctx)}`;
 
-	if (ts.isCallExpression(node.parent) || ts.isParenthesizedExpression(node.parent)) {
+	if (ts.isCallOrNewExpression(node.parent) || ts.isParenthesizedExpression(node.parent)) {
 		return "@" + createAnonFunction(body, params).name;
 	}
 
