@@ -11,18 +11,42 @@ function handleForStatement(node: ts.ForStatement, ctx: TranspileContext): strin
 	const incrementor = handleNode(node.incrementor, ctx);
 	const statement = handleNode(node.statement, ctx);
 
+	function hasContinue(n: ts.Node): boolean {
+		if (n.getChildren().some(child => {
+			if (ts.isContinueStatement(child))
+				return true;
+
+			return hasContinue(child);
+		})) {
+			return true;
+		}
+		return false;
+	}
+
+	if (!hasContinue(node)) {
+		return [
+			`${initializer}`,
+			`while (${condition})`,
+			`	${statement.trimStart()}`,
+			`	${incrementor}`,
+			`end while`
+		].join("\n");
+	}
+
+	const incrementedStateVarName = "state_" + (Date.now() * Math.random()).toFixed(0).slice(0, 6);
+
 	const output = [
-		`val_incremented = 1`,
+		`${incrementedStateVarName} = 1`,
 		`${initializer}`,
 		`while (${condition})`,
-		`	if (not val_incremented) then`,
+		`	if (not ${incrementedStateVarName}) then`,
 		`		${incrementor}`,
 		`		if (not ${condition}) then break`,
 		`	end if`,
-		`	val_incremented = 0`,
-		`	${statement}`,
+		`	${incrementedStateVarName} = 0`,
+		`	${statement.trimStart()}`,
 		`	${incrementor}`,
-		`	val_incremented = 1`,
+		`	${incrementedStateVarName} = 1`,
 		`end while`,
 	].join("\n");
 	
@@ -47,7 +71,7 @@ function handleIfStatement(node: ts.IfStatement, ctx: TranspileContext): string 
 	const condition = handleNode(node.expression, ctx);
 	const thenStatement = handleNode(node.thenStatement, ctx);
 
-	if (!ts.isBlock(node.thenStatement) && !ts.isIfStatement(node.thenStatement) && !node.elseStatement && node.parent.kind !== ts.SyntaxKind.IfStatement)
+	if (!ts.isBlock(node.thenStatement) && !ts.isIfStatement(node.thenStatement) && !node.elseStatement && !ts.isIfStatement(node.parent))
 		return `if (${condition}) then ${thenStatement}`;
 
 	let output = `if (${condition}) then\n${thenStatement}`;
