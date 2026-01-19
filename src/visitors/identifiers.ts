@@ -57,5 +57,10 @@ NodeHandler.register(ts.SyntaxKind.SuperKeyword, (node: ts.SuperExpression) => {
 NodeHandler.register(ts.SyntaxKind.RegularExpressionLiteral, (node: ts.RegularExpressionLiteral) => {
 	const start = node.text.indexOf("/")! + 1;
 	const end = node.text.lastIndexOf("/")!;
+
+	const flags = node.text.slice(end + 1);
+	if (flags)
+		throw "Regex flags are not supported yet";
+
 	return `"${node.text.slice(start, end)}"`;
 });

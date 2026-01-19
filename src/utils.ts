@@ -166,7 +166,7 @@ export function findProjectRoot(dir: string, fileToSearch = "package.json"): str
 }
 
 export function callUtilFunction(functionName: keyof typeof utilFunctions, ...params: string[]) {
-	calledUtilFunctions.set(functionName, true);
+	calledUtilFunctions.add(functionName);
 	return `${functionName}(${params.join(", ")})`;
 }
 

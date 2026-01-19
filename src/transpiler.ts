@@ -23,7 +23,7 @@ export class NodeHandler {
 	static handlers: Map<ts.SyntaxKind, HandlerType<any>> = new Map();
 	static transpileContext: TranspileContext;
 
-	static register<T extends ts.Node>(kind: ts.SyntaxKind, handler: HandlerType<T>) {
+	static register<T extends ts.Node>(kind: T["kind"], handler: HandlerType<T>) {
 		if (this.handlers.has(kind))
 			throw `${ts.SyntaxKind[kind]} (${kind}) is already registered`;
 
@@ -38,7 +38,7 @@ export class NodeHandler {
 			return "null";
 		}
 
-		// console.log(ts.SyntaxKind[node.kind], node.kind, ts.isDeclarationStatement(node), node.getText());
+		// console.log(ts.SyntaxKind[node.kind], node.kind, node.getText());
 		try {
 			const result = handler(node, this.transpileContext);
 			return result;
@@ -65,7 +65,7 @@ export let program: ts.Program;
 export let checker: ts.TypeChecker;
 
 const anonFunctions = new Map<string, string>();
-export const calledUtilFunctions = new Map<keyof typeof utilFunctions, boolean>();
+export const calledUtilFunctions = new Set<keyof typeof utilFunctions>()
 export const utilFunctions = {
 	"get_property": [
 		"get_property = function(obj, key)",
@@ -182,6 +182,15 @@ export const utilFunctions = {
 		"	end for",
 		"	return 1",
 		"end function",
+	].join("\n"),
+	"array_concat": [
+		"array_concat = function(target, items)",
+		"	out = target[0:]",
+		"	for item in items",
+		"		if item isa list then out = out + item else out.push(item)",
+		"	end for",
+		"	return out",
+		"end function"
 	].join("\n"),
 	"math_min": [
 		"math_min = function(numbers)",

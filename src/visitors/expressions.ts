@@ -1,7 +1,8 @@
-import path from "node:path";
+
 import ts from "typescript";
-import { calledUtilFunctions, checker, NodeHandler, transpileSourceFile, type TranspileContext } from "../transpiler";
-import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
+import { CallTransformer } from "../callTransformer";
+import { calledUtilFunctions, checker, NodeHandler, type TranspileContext } from "../transpiler";
+import { asRef, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
 /** Calculate the count of required (non-optional, non-default) parameters */
 function calculateRequiredParams(params: readonly ts.Symbol[]): number {
@@ -138,70 +139,11 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 		symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
 	}
 
-	// TODO: more modular system than this...
-	if (symbolFullName === "Array.concat") {
-		const dotI = name.lastIndexOf(".");
-		args.unshift(name.slice(0, dotI));
-		return args.join(" + ");
-	}
-	else if (symbolFullName === "Array.map") {
-		if (!args.length) throw "Invalid argument count";
-		return callUtilFunction("array_map", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
-	}
-	else if (symbolFullName === "Array.filter") {
-		if (!args.length) throw "Invalid argument count";
-		return callUtilFunction("array_filter", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
-	}
-	else if (symbolFullName === "Array.find") {
-		if (!args.length) throw "Invalid argument count";
-		return callUtilFunction("array_find", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
-	}
-	else if (symbolFullName === "Array.some") {
-		if (!args.length) throw "Invalid argument count";
-		return callUtilFunction("array_some", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
-	}
-	else if (symbolFullName === "Array.every") {
-		if (!args.length) throw "Invalid argument count";
-		return callUtilFunction("array_every", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
-	}
-	else if (symbolFullName === "Math.min") {
-		return callUtilFunction("math_min", `${args.join(",")}`);
-	}
-	else if (symbolFullName === "Math.max") {
-		return callUtilFunction("math_max", `${args.join(",")}`);
-	}
+	const transformed = CallTransformer.handle(symbolFullName, name, args, node, ctx);
+	if (transformed !== null) return transformed;
 
-	if (symbolFullName === "GreyHack.include") {
-		if (!node.arguments.length) return "";
-		const fileArg = node.arguments[0]!;
-		if (!ts.isStringLiteralLike(fileArg))
-			throw "You can't include variables";
-
-		const absPath = path.resolve(ctx.currentFolder, fileArg.text);
-		const sources = getSourceFiles(absPath);
-
-		for (const source of sources) {
-			transpileSourceFile(source, ctx);
-		}
-
-		return "";
-	}
-
-	if (symbolFullName === "ObjectConstructor.hasOwn") {
-		if (args.length < 2) throw "Invalid argument count";
-
-		return `${args[0]}.hasIndex(${args[1]})`;
-	}
-	else if (symbolFullName === "ObjectConstructor.assign") {
-		if (args.length < 2) throw "Invalid argument count";
-		return callUtilFunction("assign_objects", args.join(","));
-	}
-	else if (symbolFullName === "ObjectConstructor.keys") {
-		return `${[args[0]]}.indexes`;
-	}
-
-	if (name === "is_type" && !calledUtilFunctions.get("is_type")) {
-		calledUtilFunctions.set("is_type", true);
+	if (name === "is_type" && !calledUtilFunctions.has("is_type")) {
+		calledUtilFunctions.add("is_type");
 	}
 
 	if (!args.length)
