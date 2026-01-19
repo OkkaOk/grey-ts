@@ -87,10 +87,14 @@ NodeHandler.register(ts.SyntaxKind.IfStatement, (node: ts.IfStatement) => {
 	const condition = NodeHandler.handle(node.expression);
 	const thenStatement = NodeHandler.handle(node.thenStatement);
 
-	if (!ts.isBlock(node.thenStatement) && !ts.isIfStatement(node.thenStatement) && !node.elseStatement && !ts.isIfStatement(node.parent))
-		return `if ${condition} then ${thenStatement}`;
+	if (!ts.isBlock(node.thenStatement) && !ts.isIfStatement(node.thenStatement) && !ts.isIfStatement(node.parent)) {
+		if (!node.elseStatement)
+			return `if ${condition} then ${thenStatement}`;
+		else if (!ts.isBlock(node.elseStatement) && !ts.isIfStatement(node.elseStatement))
+			return `if ${condition} then ${thenStatement} else ${NodeHandler.handle(node.elseStatement)}`;
+	}
 
-	let output = `if ${condition} then\n${thenStatement}`;
+	let output = `if ${condition} then\n\t${thenStatement.trimStart()}`;
 
 	if (node.elseStatement) {
 		if (ts.isIfStatement(node.elseStatement)) {
@@ -98,7 +102,7 @@ NodeHandler.register(ts.SyntaxKind.IfStatement, (node: ts.IfStatement) => {
 			return output;
 		}
 		else {
-			output += `\nelse\n${NodeHandler.handle(node.elseStatement)}`;
+			output += `\nelse\n\t${NodeHandler.handle(node.elseStatement).trimStart()}`;
 		}
 	}
 

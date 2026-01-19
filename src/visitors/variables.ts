@@ -7,7 +7,6 @@ function handleVariableDeclaration(
 	ctx: TranspileContext
 ): string {
 	const left = NodeHandler.handle(node.name);
-	
 	const initializerType = node.initializer ? checker.getTypeAtLocation(node.initializer) : undefined;
 
 	if (ts.isPropertyDeclaration(node) && initializerType?.flags === ts.TypeFlags.Object) {
@@ -28,6 +27,9 @@ NodeHandler.register(ts.SyntaxKind.VariableDeclarationList, (node: ts.VariableDe
 })
 
 NodeHandler.register(ts.SyntaxKind.VariableStatement, (node: ts.VariableStatement, ctx) => {
+	if (node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword))
+		return "";
+
 	return NodeHandler.handle(node.declarationList);
 });
 

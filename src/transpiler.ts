@@ -78,31 +78,56 @@ export const utilFunctions = {
 		"	isaobj = obj",
 		"	while isaobj.hasIndex(\"__isa\")",
 		"		isaobj = obj[\"__isa\"]",
-		"		if isaobj.hasIndex(key) then return obj[key]()",
+		"		if isaobj.hasIndex(key) then",
+		"			val = obj[key]",
+		"			return val", // Doesn't seem to like obj[key]() so this is a workaround
+		"		end if",
 		"	end while",
 		"	return null",
 		"end function",
 	].join("\n"),
 	"assign_objects": [
-		"assign_objects = function(target, sources)",
-		"	for source in sources",
-		"		if typeof(source) == \"list\" then",
-		"			if typeof(target) == \"list\" then",
-		"				for i in range(0, source.len - 1, 1)",
-		"					if target.len() <= i then target.push(null)",
-		"					target[i] = source[i]",
-		"				end for",
-		"			else",
-		"				for i in range(0, source.len - 1, 1)",
-		"					target[str(i)] = source[i]",
-		"				end for",
-		"			end if",
-		"		else if typeof(source) == \"map\" then",
+		"assign_objects = function(target, source1, source2, source3)",
+		"	assign_to_list = function(target, source)",
+		"		if source isa list then",
+		"			for i in range(0, source.len - 1, 1)",
+		"				if target.len <= i then target.push(null)",
+		"				target[i] = source[i]",
+		"			end for",
+		"		else if source isa map then",
+		"			for item in source",
+		"				key = str(item.key).to_int",
+		"				if key isa number then target[key] = item.value",
+		"			end for",
+		"		end if",
+		"		return target",
+		"	end function",
+		"	counter = 0",
+		"	assign_object = function(target, source)",
+		"		if target isa list then return assign_to_list(target, source)",
+		"		if source isa list then",
+		"			for i in range(0, source.len - 1, 1)",
+		"				target[str(i)] = source[i]",
+		"			end for",
+		"		else if source isa map then",
 		"			for item in source",
 		"				target[item.key] = item.value",
 		"			end for",
+		"		else",
+		"			target[str(outer.counter)] = source",
+		"			outer.counter = outer.counter + 1",
 		"		end if",
-		"	end for",
+		"	end function",
+		"	if source1 isa list then",
+		"		if target isa list then return assign_to_list(target, source1)",
+		"		for source in source1",
+		"			assign_object(target, source)",
+		"		end for",
+		"		return target",
+		"	end if",
+		"	if source1 then assign_object(target, source1)",
+		"	if source2 then assign_object(target, source2)",
+		"	if source3 then assign_object(target, source3)",
 		"	return target",
 		"end function"
 	].join("\n"),
@@ -162,7 +187,7 @@ export const utilFunctions = {
 		"math_min = function(numbers)",
 		"	curr_min = null",
 		"	for num in numbers",
-		"		if not curr_min or num < curr_min then curr_min = num",
+		"		if curr_min == null or num < curr_min then curr_min = num",
 		"	end for",
 		"	return curr_min",
 		"end function"
@@ -171,7 +196,7 @@ export const utilFunctions = {
 		"math_max = function(numbers)",
 		"	curr_max = null",
 		"	for num in numbers",
-		"		if not curr_max or num > curr_max then curr_max = num",
+		"		if curr_max == null or num > curr_max then curr_max = num",
 		"	end for",
 		"	return curr_max",
 		"end function"
@@ -320,13 +345,13 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 	if (ctx.visitedFiles[sourceFile.fileName])
 		return "";
 
+	ctx.visitedFiles[sourceFile.fileName] = true;
+
 	if (sourceFile.isDeclarationFile)
 		return "";
 
 	if (program.isSourceFileDefaultLibrary(sourceFile) || program.isSourceFileFromExternalLibrary(sourceFile))
 		return "";
-
-	ctx.visitedFiles[sourceFile.fileName] = true;
 
 	const prevFile = ctx.currentFilePath;
 
@@ -352,6 +377,5 @@ export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileCon
 	ctx.currentFilePath = prevFile;
 	ctx.currentFolder = path.dirname(prevFile);
 
-	console.log(`Transpiled ${path.basename(sourceFile.fileName)}`);
 	return output.join("\n");
 }

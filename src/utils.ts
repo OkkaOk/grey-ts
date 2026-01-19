@@ -57,11 +57,11 @@ export function nodeIsFunctionReference(node: ts.Node, type?: ts.Type) {
 	return true;
 }
 
-export function ancestorCount(node: ts.Node, ancestorKind: ts.SyntaxKind) {
+export function ancestorCount(node: ts.Node, counter: (node: ts.Node) => boolean) {
 	let count = 0;
 	while (node.parent) {
 		node = node.parent;
-		if (node.kind === ancestorKind)
+		if (counter(node))
 			count++;
 	}
 

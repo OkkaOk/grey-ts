@@ -3,28 +3,130 @@ import ts from "typescript";
 import { calledUtilFunctions, checker, NodeHandler, transpileSourceFile, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, getOperatorToken, getSourceFiles, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
-/** Modifies the args to fit if there are rest parameters so it puts them in an array. */
-function modifyArgs(args: string[], parameters: readonly ts.Symbol[]) {
-	for (let i = 0; i < parameters.length || 0; i++) {
-		const param = parameters[i]!;
-		if (!param.valueDeclaration) continue;
+/** Calculate the count of required (non-optional, non-default) parameters */
+function calculateRequiredParams(params: readonly ts.Symbol[]): number {
+	for (let i = params.length - 1; i >= 0; i--) {
+		const param = params[i]!;
+		if (!param.valueDeclaration || !ts.isParameter(param.valueDeclaration)) continue;
+		if (param.valueDeclaration.dotDotDotToken) continue; // rest param doesn't count
+		if (param.valueDeclaration.questionToken) continue; // optional
+		if (param.valueDeclaration.initializer) continue; // has default
 
-		if (ts.isParameter(param.valueDeclaration) && param.valueDeclaration.dotDotDotToken) {
-			if (args.length <= i) args.push(...new Array(i - args.length).fill("null"));
+		return i + 1;
+	}
+	return 0;
+}
 
-			args[i] = `[${args.splice(i).join(", ")}]`;
-			break;
+/** Check if the last parameter is a rest parameter */
+function hasRestParam(params: readonly ts.Symbol[]): boolean {
+	if (!params.length) return false;
+	const lastParam = params[params.length - 1]!;
+	return !!(lastParam.valueDeclaration && ts.isParameter(lastParam.valueDeclaration) && lastParam.valueDeclaration.dotDotDotToken);
+}
+
+function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: TranspileContext): string[] {
+	const args = callNode.arguments;
+	if (!args) return [];
+
+	const result: string[] = [];
+	const acc: string[] = [];
+	const restArrays: string[] = [];
+
+	const params = checker.getResolvedSignature(callNode)?.parameters || [];
+	const requiredParamCount = calculateRequiredParams(params);
+	const hasRestParameter = hasRestParam(params);
+
+	let remainingRequired = requiredParamCount;
+
+	function pushAcc(...items: string[]) {
+		for (const item of items) {
+			if (remainingRequired > 0) {
+				result.push(item);
+				remainingRequired--;
+				continue;
+			}
+
+			acc.push(item);
+			remainingRequired--;
 		}
 	}
 
-	return args;
+	for (const arg of args) {
+		if (!ts.isSpreadElement(arg)) {
+			pushAcc(NodeHandler.handle(arg));
+			continue;
+		}
+
+		if (ts.isArrayLiteralExpression(arg.expression)) {
+			const arrayItems: string[] = [];
+			const outArrs: string[] = [];
+			handleArrayLiteralExpression(arg.expression, ctx, arrayItems, outArrs);
+
+			// TODO: Maybe do something smarter? Although why would anyone reach this error :/
+			if (outArrs.length > 1)
+				throw "The transpiler can't handle it yet if there are nested spread elements as parameters";
+
+			pushAcc(...arrayItems);
+			continue;
+		}
+
+		const arrayName = NodeHandler.handle(arg.expression);
+
+		// Not perfect. Fails at runtime if the array's length is less than the missing params
+		// Although typescript should complain about it so maybe this is not a problem?
+		if (remainingRequired > 0) {
+			for (let i = 0; i < remainingRequired; i++) {
+				result.push(`${arrayName}[${i}]`);
+			}
+
+			if (hasRestParameter) restArrays.push(`${arrayName}[${remainingRequired}:]`);
+			remainingRequired = 0;
+			continue;
+		}
+
+		if (acc.length) {
+			restArrays.push(`[${acc.join(",")}]`);
+			acc.length = 0;
+		}
+
+		restArrays.push(arrayName);
+		remainingRequired--;
+	}
+
+	if (acc.length) {
+		if (remainingRequired > 0 || !hasRestParameter) {
+			result.push(...acc);
+		}
+		else {
+			const arr: string[] = [];
+			for (const item of acc) {
+				if (item[0] !== "[") {
+					arr.push(item);
+					continue;
+				}
+
+				if (arr.length) {
+					restArrays.push(`[${arr.join(",")}]`);
+					arr.length = 0;
+				}
+				restArrays.push(item);
+			}
+
+			if (arr.length) restArrays.push(`[${arr.join(",")}]`);
+		}
+	}
+
+	if (restArrays.length) {
+		result.push(restArrays.join(" + "));
+	}
+
+	return result;
 }
 
 NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx) => {
-	const args = node.arguments.map(arg => NodeHandler.handle(arg));
+	const args = handleCallArgs(node, ctx);
 
 	let name = NodeHandler.handle(node.expression);
-	// if (name && name[0] === "@") name = name.slice(1); // Don't need it in call expression
 
 	const type = checker.getTypeAtLocation(node.expression);
 	let symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
@@ -63,10 +165,10 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 		return callUtilFunction("array_every", name.slice(0, name.lastIndexOf(".") || undefined), args[0]!);
 	}
 	else if (symbolFullName === "Math.min") {
-		return callUtilFunction("math_min", `[${args.join(",")}]`);
+		return callUtilFunction("math_min", `${args.join(",")}`);
 	}
 	else if (symbolFullName === "Math.max") {
-		return callUtilFunction("math_max", `[${args.join(",")}]`);
+		return callUtilFunction("math_max", `${args.join(",")}`);
 	}
 
 	if (symbolFullName === "GreyHack.include") {
@@ -92,16 +194,11 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 	}
 	else if (symbolFullName === "ObjectConstructor.assign") {
 		if (args.length < 2) throw "Invalid argument count";
-		return callUtilFunction("assign_objects", args[0]!, `[${args.slice(1).join(",")}]`);
+		return callUtilFunction("assign_objects", args.join(","));
 	}
 	else if (symbolFullName === "ObjectConstructor.keys") {
 		return `${[args[0]]}.indexes`;
 	}
-
-	const callParams = checker.getResolvedSignature(node)?.parameters || [];
-
-	// console.log(ts.SyntaxKind[node.expression.kind], node.expression.getText(), callParams.length, symbolFullName)
-	modifyArgs(args, callParams);
 
 	if (name === "is_type" && !calledUtilFunctions.get("is_type")) {
 		calledUtilFunctions.set("is_type", true);
@@ -113,13 +210,13 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 	return `${name}(${args.join(", ")})`;
 });
 
-NodeHandler.register(ts.SyntaxKind.NewExpression, (node: ts.NewExpression) => {
-	const args = node.arguments?.map(arg => NodeHandler.handle(arg)) || [];
+NodeHandler.register(ts.SyntaxKind.NewExpression, (node: ts.NewExpression, ctx) => {
+	const args = handleCallArgs(node, ctx);
 
-	const constructArgs = checker.getResolvedSignature(node)?.parameters || [];
-	modifyArgs(args, constructArgs);
+	let output = `(new ${NodeHandler.handle(node.expression)}).constructor`;
+	if (args.length)
+		output += `(${args.join(",")})`;
 
-	const output = `(new ${NodeHandler.handle(node.expression)}).constructor(${args.join(",")})`;
 	return output;
 });
 
@@ -211,8 +308,13 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 	if (operator === "--")
 		return `${operand} = ${operand} - 1`;
 
-	if (operator === "!")
+	if (operator === "!") {
+		if (ts.isPrefixUnaryExpression(node.parent) && ts.tokenToString(node.parent.operator) === "!") {
+			return `(not ${operand})`;
+		}
+
 		return `not ${operand}`;
+	}
 
 	if (operator === "-")
 		return `-${operand}`;
@@ -228,38 +330,6 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 
 NodeHandler.register(ts.SyntaxKind.PrefixUnaryExpression, handleUnaryExpression);
 NodeHandler.register(ts.SyntaxKind.PostfixUnaryExpression, handleUnaryExpression);
-
-NodeHandler.register(ts.SyntaxKind.SpreadElement, (node: ts.SpreadElement, ctx) => {
-	// Here the parent can't be ArrayLiteralExpression anymore as I handle this node there
-	// So the parent can only be either ts.CallExpression or ts.NewExpression
-	if (ts.isArrayLiteralExpression(node.parent))
-		throw new Error("SpreadElement's parent was ArrayLiteralExpression which shouldn't have been possible");
-
-	if (ts.isArrayLiteralExpression(node.expression)) {
-		const items: string[] = [];
-		const out: string[] = [];
-		handleArrayLiteralExpression(node.expression, ctx, items, out);
-
-		// TODO: do something smarter...
-		if (out.length > 1)
-			throw "The transpiler can't handle it yet if there are nested spread elements as parameters";
-
-		return items.join(", ");
-		// return node.expression.elements.map(item => NodeHandler.handle(item, ctx)).join(", ");
-	}
-
-	const params = checker.getResolvedSignature(node.parent)?.parameters || [];
-	const missingParamCount = params.length - (node.parent.arguments?.length ?? 0) + 1;
-
-	const spreadCount = node.parent.arguments?.map(p => ts.isSpreadElement(p) ? 1 : 0).reduce<number>((acc, curr) => acc + curr, 0) ?? 1;
-
-	// TODO: This spaghetti doesn't work if there are more than 1 spread element in the parameters so let's throw
-	if (spreadCount > 1)
-		throw "The transpiler can't currently handle it if there are more than 1 spread operator as a parameter";
-
-	const name = NodeHandler.handle(node.expression);
-	return new Array(missingParamCount).fill(0).map((_, i) => `${name}[${i}]`).join(", ");
-});
 
 export function handleArrayLiteralExpression(node: ts.ArrayLiteralExpression, ctx: TranspileContext, itemStrings?: string[], out?: string[]): string {
 	itemStrings ??= [];
@@ -293,10 +363,7 @@ export function handleArrayLiteralExpression(node: ts.ArrayLiteralExpression, ct
 		out.push(NodeHandler.handle(item.expression));
 	}
 
-	if (out.length && itemStrings.length) {
-		out.push(`[${itemStrings.join(",")}]`);
-		itemStrings.length = 0;
-	} else if (!out.length) {
+	if ((!out.length || itemStrings.length) && !ts.isSpreadElement(node.parent)) {
 		out.push(`[${itemStrings.join(",")}]`);
 		itemStrings.length = 0;
 	}
