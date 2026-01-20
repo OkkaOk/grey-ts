@@ -69,12 +69,12 @@ export const calledUtilFunctions = new Set<keyof typeof utilFunctions>()
 export const utilFunctions = {
 	"get_property": [
 		"get_property = function(obj, key)",
-		"	if obj isa list and list.hasIndex(key) then return obj[key]",
-		"	if obj isa map and map.hasIndex(key) then return obj[key]",
-		"	if obj isa string and string.hasIndex(key) then return obj[key]",
-		"	if obj isa number and number.hasIndex(key) then return obj[key]",
 		"	if not obj then return null",
-		"	if obj.hasIndex(key) then return @obj[key]",
+		"	if obj.hasIndex(key) then return obj[key]",
+		// "	if obj isa list and list.hasIndex(key) then return obj[key]",
+		// "	if obj isa map and map.hasIndex(key) then return obj[key]",
+		// "	if obj isa string and string.hasIndex(key) then return obj[key]",
+		// "	if obj isa number and number.hasIndex(key) then return obj[key]",
 		"	isaobj = obj",
 		"	while isaobj.hasIndex(\"__isa\")",
 		"		isaobj = obj[\"__isa\"]",

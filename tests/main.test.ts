@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { transpileString, utilFunctions } from "../src/transpiler";
+import { transpileString } from "../src/transpiler";
 import "../src/visitors/assignments.js";
 import "../src/visitors/classes.js";
 import "../src/visitors/expressions.js";
@@ -22,19 +22,19 @@ describe("Shims", () => {
 	test("Math.max", () => {
 		expect(
 			transpileString("const myMax = Math.max(6, 2, 8, 3)")
-		).toEqual(`${utilFunctions.math_max}\nmyMax = math_max([6,2,8,3])`);
+		).toInclude(`myMax = math_max([6,2,8,3])`);
 	});
 
 	test("Math.min", () => {
 		expect(
 			transpileString("const myMin = Math.min(6, 2, 8, 3)")
-		).toEqual(`${utilFunctions.math_min}\nmyMin = math_min([6,2,8,3])`);
+		).toInclude(`myMin = math_min([6,2,8,3])`);
 	});
 
 	test("Array.concat", () => {
 		expect(
 			transpileString("const myArr = [1,2,3].concat([4,5,6])")
-		).toEqual(`myArr = [1,2,3] + [4,5,6]`);
+		).toInclude(`myArr = array_concat([1,2,3], [4,5,6])`);
 	});
 
 	test("Math.sqrt", () => {

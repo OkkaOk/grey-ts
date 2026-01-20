@@ -4,20 +4,6 @@ import { CallTransformer } from "../callTransformer";
 import { calledUtilFunctions, checker, NodeHandler, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
-/** Calculate the count of required (non-optional, non-default) parameters */
-function calculateRequiredParams(params: readonly ts.Symbol[]): number {
-	for (let i = params.length - 1; i >= 0; i--) {
-		const param = params[i]!;
-		if (!param.valueDeclaration || !ts.isParameter(param.valueDeclaration)) continue;
-		if (param.valueDeclaration.dotDotDotToken) continue; // rest param doesn't count
-		if (param.valueDeclaration.questionToken) continue; // optional
-		if (param.valueDeclaration.initializer) continue; // has default
-
-		return i + 1;
-	}
-	return 0;
-}
-
 /** Check if the last parameter is a rest parameter */
 function hasRestParam(params: readonly ts.Symbol[]): boolean {
 	if (!params.length) return false;
@@ -30,16 +16,16 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 	if (!args) return [];
 
 	const result: string[] = [];
-	const acc: string[] = [];
+	const restItems: string[] = [];
 	const restArrays: string[] = [];
 
 	const params = checker.getResolvedSignature(callNode)?.parameters || [];
-	const requiredParamCount = calculateRequiredParams(params);
 	const hasRestParameter = hasRestParam(params);
+	const nonRestParamCount = params.length - Number(hasRestParameter);
 
-	let remainingRequired = requiredParamCount;
+	let remainingRequired = nonRestParamCount;
 
-	function pushAcc(...items: string[]) {
+	function pushArgs(...items: string[]) {
 		for (const item of items) {
 			if (remainingRequired > 0) {
 				result.push(item);
@@ -47,32 +33,37 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 				continue;
 			}
 
-			acc.push(item);
-			remainingRequired--;
+			restItems.push(item);
 		}
 	}
 
 	for (const arg of args) {
+		// Handle non-spread arguments
 		if (!ts.isSpreadElement(arg)) {
-			pushAcc(NodeHandler.handle(arg));
+			pushArgs(NodeHandler.handle(arg));
 			continue;
 		}
 
+		// Handle spread of array literal: ...[1, 2, 3]
 		if (ts.isArrayLiteralExpression(arg.expression)) {
 			const arrayItems: string[] = [];
 			const outArrs: string[] = [];
 			handleArrayLiteralExpression(arg.expression, ctx, arrayItems, outArrs);
 
 			// TODO: Maybe do something smarter? Although why would anyone reach this error :/
+			// The argument would be something like this: ...[1,2,3,...[4,5,6]]
 			if (outArrs.length > 1)
 				throw "The transpiler can't handle it yet if there are nested spread elements as parameters";
 
-			pushAcc(...arrayItems);
+			pushArgs(...arrayItems);
 			continue;
 		}
 
+		// Handle spread of identifier: ...arr
+
 		const arrayName = NodeHandler.handle(arg.expression);
 
+		// Fill remaining params from the spread array
 		// Not perfect. Fails at runtime if the array's length is less than the missing params
 		// Although typescript should complain about it so maybe this is not a problem?
 		if (remainingRequired > 0) {
@@ -85,35 +76,34 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 			continue;
 		}
 
-		if (acc.length) {
-			restArrays.push(`[${acc.join(",")}]`);
-			acc.length = 0;
+		if (restItems.length) {
+			restArrays.push(`[${restItems.join(",")}]`);
+			restItems.length = 0;
 		}
 
 		restArrays.push(arrayName);
-		remainingRequired--;
 	}
 
-	if (acc.length) {
+	if (restItems.length) {
 		if (remainingRequired > 0 || !hasRestParameter) {
-			result.push(...acc);
+			result.push(...restItems);
 		}
 		else {
-			const arr: string[] = [];
-			for (const item of acc) {
+			const processedItems: string[] = [];
+			for (const item of restItems) {
 				if (item[0] !== "[") {
-					arr.push(item);
+					processedItems.push(item);
 					continue;
 				}
 
-				if (arr.length) {
-					restArrays.push(`[${arr.join(",")}]`);
-					arr.length = 0;
+				if (processedItems.length) {
+					restArrays.push(`[${processedItems.join(",")}]`);
+					processedItems.length = 0;
 				}
 				restArrays.push(item);
 			}
 
-			if (arr.length) restArrays.push(`[${arr.join(",")}]`);
+			if (processedItems.length) restArrays.push(`[${processedItems.join(",")}]`);
 		}
 	}
 
@@ -196,6 +186,21 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 
 	if (operatorToken === "or" && (ts.isVariableDeclaration(node.parent) || ts.isPropertyAssignment(node.parent))) {
 		return callUtilFunction("or_op", left, right);
+	}
+
+	if (operatorToken === "instanceof") {
+		const rightSymbol = checker.getSymbolAtLocation(node.right);
+		const classIdMember = rightSymbol?.members?.get(ts.escapeLeadingUnderscores("classID"));
+		if (!classIdMember) {
+			throw `Can't handle this 'instanceof' operator because '${right}' doesn't have a 'classID' member, which is needed in GreyScript to check a type`;
+		}
+
+		const declaration = classIdMember.valueDeclaration as ts.PropertyDeclaration | undefined
+		if (!declaration || !("initializer" in declaration) || !declaration.initializer) {
+			throw `The 'classID' property of '${right}' isn't initialized`;
+		}
+		
+		return `${left}.classID == typeof(${right})`;
 	}
 
 	if (operatorToken === "??") {

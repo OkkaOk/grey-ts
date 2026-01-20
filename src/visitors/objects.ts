@@ -6,19 +6,19 @@ const assignmentOperators = new Set<string>([
 	"=", "??=", "||=", "-=", "+="
 ]);
 
-function valueIsBeingAssignedToNode(node: ts.Node) {
-	if (ts.isBinaryExpression(node.parent)) {
-		if (node !== node.parent.left)
-			return false;
+function valueIsBeingAssignedToNode(node: ts.Node): boolean {
+	const assignAncestor = ts.findAncestor(node, ancestor => {
+		if (ancestor.parent && ts.isBinaryExpression(ancestor.parent) && ancestor === ancestor.parent.left) {
+			const token = ts.tokenToString(ancestor.parent.operatorToken.kind) || ancestor.parent.operatorToken.getText();
+			return assignmentOperators.has(token);
+		}
 
-		const token = ts.tokenToString(node.parent.operatorToken.kind) || node.parent.operatorToken.getText();
-		return assignmentOperators.has(token);
-	}
-
+		return false;
+	});
 	// if (ts.isVariableDeclaration(node.parent) && node === node.parent.name)
 	// 	return true;
 
-	return false;
+	return !!assignAncestor;
 }
 
 NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyAccessExpression, ctx) => {
@@ -77,7 +77,16 @@ NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAcc
 		right = NodeHandler.handle(node.argumentExpression);
 	}
 
-	if (!valueIsBeingAssignedToNode(node) && !ts.isNumericLiteral(node.argumentExpression)) {
+	const asd = ts.findAncestor(node, ancestor => {
+		if (ancestor.parent && ts.isBinaryExpression(ancestor.parent) && ancestor === ancestor.parent.left) {
+			const token = ts.tokenToString(ancestor.parent.operatorToken.kind) || ancestor.parent.operatorToken.getText();
+			return assignmentOperators.has(token);
+		}
+
+		return false;
+	});
+
+	if (!asd && !ts.isNumericLiteral(node.argumentExpression)) {
 		return callUtilFunction("get_property", left, `${right}`);
 	}
 
