@@ -8,7 +8,7 @@
 	},
 	"type": "module",
 	"types": "./dist/index.d.ts",
-	"private": true,
+	"private": false,
 	"license": "MIT",
 	"keywords": [
 		"transpiler",
@@ -39,6 +39,6 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"@grey-ts/types": "https://github.com/OkkaOk/grey-ts-types"
+		"@grey-ts/types": "^1.3.0"
 	}
 }

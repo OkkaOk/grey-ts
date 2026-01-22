@@ -18,4 +18,4 @@ bun/npx greyts transpile pathToMyFile.ts
 ```
 
 
-<!-- To easily start writing your code for GreyHack, use [this template](https://github.com/OkkaOk/grey-ts-template) instead of using this manually. -->
+To easily start writing your code for GreyHack, use [this template](https://github.com/OkkaOk/grey-ts-template) instead of using this manually.
