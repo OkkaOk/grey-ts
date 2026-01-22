@@ -12,7 +12,6 @@
 		"allowJs": true,
 		"typeRoots": [
 			"./node_modules/@types",
-			"./node_modules/@grey-ts"
 		],
 
 		"allowImportingTsExtensions": false,

@@ -35,3 +35,21 @@ NodeHandler.register(ts.SyntaxKind.VariableStatement, (node: ts.VariableStatemen
 
 NodeHandler.register(ts.SyntaxKind.VariableDeclaration, handleVariableDeclaration);
 NodeHandler.register(ts.SyntaxKind.PropertyDeclaration, handleVariableDeclaration);
+
+NodeHandler.register<ts.EnumDeclaration>(ts.SyntaxKind.EnumDeclaration, (node) => {
+	const members = node.members.map((member, index) => {
+		const name = NodeHandler.handle(member.name);
+		if (member.initializer) {
+			return `${name}: ${NodeHandler.handle(member.initializer)}`;
+		}
+
+		const type = checker.getTypeAtLocation(member);
+		if ("value" in type) {
+			return `${name}: ${type.value}`;
+		}
+
+		return `${name}: ${index}`;
+	});
+
+	return `${node.name.text} = { ${members.join(", ")} }`;
+})

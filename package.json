@@ -29,8 +29,7 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "bun run scripts/build.ts",
-		"transpile": "bun run src/index.ts transpile"
+		"build": "bun run scripts/build.ts"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

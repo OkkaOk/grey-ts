@@ -60,6 +60,7 @@ export class NodeHandler {
 NodeHandler.register(ts.SyntaxKind.TypeAliasDeclaration, () => "");
 NodeHandler.register(ts.SyntaxKind.InterfaceDeclaration, () => "");
 NodeHandler.register(ts.SyntaxKind.EndOfFileToken, () => "");
+NodeHandler.register(ts.SyntaxKind.EmptyStatement, () => "");
 
 export let program: ts.Program;
 export let checker: ts.TypeChecker;
@@ -301,9 +302,18 @@ export function transpileProgram(entryFileRelativePath: string) {
 	const parsed = ts.parseJsonConfigFileContent(res.config, ts.sys, path.dirname(tsconfigPath));
 	// console.log(parsed)
 
+	if (!parsed.options.types)
+		parsed.options.types = [];
+
+	if (!parsed.options.types.includes("@grey-ts/types")) {
+		parsed.options.types.push("@grey-ts/types")
+	}
+	
+	parsed.options.noLib = true;
+
 	program = ts.createProgram({
 		rootNames: parsed.fileNames,
-		options: Object.assign(parsed.options, { noLib: true }),
+		options: parsed.options,
 		// rootNames: [ctx.currentFilePath],
 		// options: {
 		// 	target: ts.ScriptTarget.Latest,

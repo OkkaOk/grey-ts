@@ -14,7 +14,7 @@ export const apiNameMap: Record<string, string> = {
 	"GreyHack.BlockChain.loginWallet": "login_wallet",
 	"GreyHack.BlockChain.showHistory": "show_history",
 	// Coin
-	"GreyHack.Coin.createSubwallet": "create_subwallet",
+	"GreyHack.Coin.createSubWallet": "create_subwallet",
 	"GreyHack.Coin.getAddress": "get_address",
 	"GreyHack.Coin.getCycleMining": "get_cycle_mining",
 	"GreyHack.Coin.getMinedCoins": "get_mined_coins",

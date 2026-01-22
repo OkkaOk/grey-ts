@@ -30,7 +30,7 @@ export function getOperatorToken(node: ts.Node) {
 export function transformString(value: string): string {
 	value = value
 		.replaceAll('"', '\"\"')
-		.replaceAll("\n", `" + char(10) + "`); // Replacing with \\n messes with shell.build
+		.replaceAll("\n", ` \\n`);
 	return value;
 }
 
