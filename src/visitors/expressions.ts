@@ -170,13 +170,21 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 		const leftType = checker.getTypeAtLocation(node.left.expression);
 		const symbol = leftType.getProperty(node.left.name.text);
 
-		if (symbol?.declarations && ts.isSetAccessor(symbol.declarations[0]!)) {
-			if (operatorToken != "=") {
-				// TODO: make this work with others
-				throw "Set accessor can only work with = operator for now.";
+		if (symbol?.declarations?.some(decl => ts.isSetAccessor(decl))) {
+			const objName = NodeHandler.handle(node.left.expression);
+			const key = node.left.name.text;
+
+			if (operatorToken !== "=" && symbol.declarations.some(decl => ts.isGetAccessor(decl)))
+				throw `Can't handle '${operatorToken}' because '${objName}' doesn't have a getter '${key}'`;
+
+			if (operatorToken === "+=" || operatorToken === "-=") {
+				right = `${objName}.${key} ${operatorToken[0]} ${right}`;
+			}
+			else if (operatorToken !== "=") {
+				throw `The transpiler can't handle ${operatorToken} operator for setters yet`;
 			}
 
-			return `${NodeHandler.handle(node.left.expression)}.${node.left.name.text}(${right})`;
+			return `${objName}.set_${key}(${right})`;
 		}
 	}
 

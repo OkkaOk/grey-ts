@@ -54,5 +54,5 @@ NodeHandler.register(ts.SyntaxKind.SetAccessor, (node: ts.SetAccessorDeclaration
 	const body = NodeHandler.handle(node.body);
 	const params = node.parameters.map(param => NodeHandler.handle(param)); // Should only be 1 parameter
 
-	return `${NodeHandler.handle(node.name)} = function(${params.join(", ")})\n${body}\nend function`;
+	return `set_${NodeHandler.handle(node.name)} = function(${params.join(", ")})\n${body}\nend function`;
 });
