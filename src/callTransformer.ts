@@ -93,3 +93,18 @@ CallTransformer.register("GreyHack.include", (name, args, node, ctx) => {
 
 	return "";
 });
+
+CallTransformer.register("Boolean", (name, args) => {
+	if (!args.length) return "0";
+	return `(not (not ${args[0]}))`;
+});
+
+CallTransformer.register("Number", (name, args) => {
+	if (!args.length) return "0";
+	return `str(${args[0]}).val`;
+});
+
+CallTransformer.register("String", (name, args) => {
+	if (!args.length) return "";
+	return `str(${args[0]})`;
+});

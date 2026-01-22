@@ -196,6 +196,7 @@ export const propertyAccessReplacements: Record<string, string> = {
 	"Math.log": "log",
 	"String.prototype": "string",
 	"Number.prototype": "number",
+	"Boolean.prototype": "number", // No boolean in GreyScript
 	"Object.prototype": "map",
 	"Array.prototype": "list",
 	"Function.prototype": "funcRef",
