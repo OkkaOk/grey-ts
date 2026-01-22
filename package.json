@@ -29,6 +29,7 @@
 		"dist"
 	],
 	"scripts": {
+		"prepare": "bun run build",
 		"build": "bun run scripts/build.ts"
 	},
 	"devDependencies": {
@@ -38,6 +39,6 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"@grey-ts/types": "link:@grey-ts/types"
+		"@grey-ts/types": "https://github.com/OkkaOk/grey-ts-types"
 	}
 }

@@ -1,6 +1,7 @@
 node_modules
 dist
 out
+tarballs
 .env
 .vscode
 *.tgz
