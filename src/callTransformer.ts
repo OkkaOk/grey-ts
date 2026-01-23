@@ -68,8 +68,28 @@ CallTransformer.register("Array.unshift", (name, args) => {
 	return callUtilFunction("array_unshift", name.slice(0, name.lastIndexOf(".")), args[0]!);
 });
 
-CallTransformer.register("Array.shift", (name) => {
-	return `${name.slice(0, name.lastIndexOf("."))}.pull`;
+CallTransformer.register("Array.toString", (name) => {
+	const arrayName = name.slice(0, name.lastIndexOf("."));
+	return `str(${arrayName})`;
+});
+
+CallTransformer.register("Array.reverse", (name) => {
+	return callUtilFunction("array_reverse", name.slice(0, name.lastIndexOf(".")));
+});
+
+CallTransformer.register("Object.toString", (name) => {
+	const objectName = name.slice(0, name.lastIndexOf("."));
+	return `str(${objectName})`;
+});
+
+CallTransformer.register("Number.toString", (name) => {
+	const number = name.slice(0, name.lastIndexOf("."));
+	return `str(${number})`;
+});
+
+CallTransformer.register("Function.toString", (name) => {
+	const func = name.slice(0, name.lastIndexOf("."));
+	return `str(@${func})`;
 });
 
 CallTransformer.register("String.startsWith", (name, args) => {
@@ -89,6 +109,10 @@ CallTransformer.register("String.repeat", (name, args) => {
 
 CallTransformer.register("String.slice", (name, args) => {
 	return name.slice(0, name.lastIndexOf(".")) + `[${args[0] ?? ""}:${args[1] ?? ""}]`;
+});
+
+CallTransformer.register("String.toString", (name) => {
+	return name.slice(0, name.lastIndexOf("."));
 });
 
 CallTransformer.register("Math.min", (name, args) => {
@@ -112,6 +136,10 @@ CallTransformer.register("ObjectConstructor.assign", (name, args) => {
 
 CallTransformer.register("ObjectConstructor.keys", (name, args) => {
 	return `${args[0]}.indexes`;
+});
+
+CallTransformer.register("ObjectConstructor.values", (name, args) => {
+	return `${args[0]}.values`;
 });
 
 CallTransformer.register("GreyHack.include", (name, args, node, ctx) => {

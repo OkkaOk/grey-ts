@@ -210,6 +210,7 @@ export const utilFunctions = {
 		"	return target.len",
 		"end function"
 	].join("\n"),
+	"array_reverse": "array_reverse = function(arr)\n\tarr.reverse\n\treturn arr\nend function",
 	"str_starts_with": [
 		"str_starts_with = function(str, search, pos = 0)",
 		"	if pos < 0 then pos = 0",
