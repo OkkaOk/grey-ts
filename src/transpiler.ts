@@ -66,7 +66,7 @@ export let program: ts.Program;
 export let checker: ts.TypeChecker;
 
 const anonFunctions = new Map<string, string>();
-export const calledUtilFunctions = new Set<keyof typeof utilFunctions>()
+export const calledUtilFunctions = new Set<keyof typeof utilFunctions>();
 export const utilFunctions = {
 	"get_property": [
 		"get_property = function(obj, key)",
@@ -193,6 +193,47 @@ export const utilFunctions = {
 		"	return out",
 		"end function"
 	].join("\n"),
+	"array_push": [
+		"array_push = function(target, items)",
+		"	for item in items",
+		"		target.push(item)",
+		"	end for",
+		"	return target.len",
+		"end function"
+	].join("\n"),
+	"array_unshift": [
+		"array_unshift = function(target, items)",
+		"	if not items.len then return target.len",
+		"	for i in range(items.len-1)",
+		"		target.insert(0, items[i])",
+		"	end for",
+		"	return target.len",
+		"end function"
+	].join("\n"),
+	"str_starts_with": [
+		"str_starts_with = function(str, search, pos = 0)",
+		"	if pos < 0 then pos = 0",
+		"	return str.indexOf(search) == pos",
+		"end function",
+	].join("\n"),
+	"str_ends_with": [
+		"str_ends_with = function(str, search, pos = null)",
+		"	if pos == null then pos = str.len",
+		"	if pos < 0 then pos = 0",
+		"	return str.indexOf(search) + search.len == pos",
+		"end function",
+	].join("\n"),
+	"str_repeat": [
+		"str_repeat = function(str, count = 0)",
+		'	if count <= 0 then return ""',
+		"	if count == 1 then return str",
+		"	out = str",
+		"	for i in range(count-2)",
+		"		out = out + str",
+		"	end for",
+		"	return out",
+		"end function",
+	].join("\n"),
 	"math_min": [
 		"math_min = function(numbers)",
 		"	curr_min = null",
@@ -306,9 +347,9 @@ export function transpileProgram(entryFileRelativePath: string) {
 		parsed.options.types = [];
 
 	if (!parsed.options.types.includes("@grey-ts/types")) {
-		parsed.options.types.push("@grey-ts/types")
+		parsed.options.types.push("@grey-ts/types");
 	}
-	
+
 	parsed.options.noLib = true;
 
 	program = ts.createProgram({

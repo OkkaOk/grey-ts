@@ -54,6 +54,43 @@ CallTransformer.register("Array.every", (name, args) => {
 	return callUtilFunction("array_every", name.slice(0, name.lastIndexOf(".")), args[0]!);
 });
 
+CallTransformer.register("Array.slice", (name, args) => {
+	return name.slice(0, name.lastIndexOf(".")) + `[${args[0] ?? ""}:${args[1] ?? ""}]`;
+});
+
+CallTransformer.register("Array.push", (name, args) => {
+	if (!args.length) throw "Invalid argument count";
+	return callUtilFunction("array_push", name.slice(0, name.lastIndexOf(".")), args[0]!);
+});
+
+CallTransformer.register("Array.unshift", (name, args) => {
+	if (!args.length) throw "Invalid argument count";
+	return callUtilFunction("array_unshift", name.slice(0, name.lastIndexOf(".")), args[0]!);
+});
+
+CallTransformer.register("Array.shift", (name) => {
+	return `${name.slice(0, name.lastIndexOf("."))}.pull`;
+});
+
+CallTransformer.register("String.startsWith", (name, args) => {
+	if (!args.length) throw "Invalid argument count";
+	return callUtilFunction("str_starts_with", name.slice(0, name.lastIndexOf(".")), ...args);
+});
+
+CallTransformer.register("String.endsWith", (name, args) => {
+	if (!args.length) throw "Invalid argument count";
+	return callUtilFunction("str_ends_with", name.slice(0, name.lastIndexOf(".")), ...args);
+});
+
+CallTransformer.register("String.repeat", (name, args) => {
+	if (!args.length) throw "Invalid argument count";
+	return callUtilFunction("str_repeat", name.slice(0, name.lastIndexOf(".")), ...args);
+});
+
+CallTransformer.register("String.slice", (name, args) => {
+	return name.slice(0, name.lastIndexOf(".")) + `[${args[0] ?? ""}:${args[1] ?? ""}]`;
+});
+
 CallTransformer.register("Math.min", (name, args) => {
 	return callUtilFunction("math_min", `${args.join(",")}`);
 });
