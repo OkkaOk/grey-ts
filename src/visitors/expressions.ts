@@ -16,8 +16,10 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 	const args = callNode.arguments;
 	if (!args) return [];
 
+	type RestItem = { text: string, fromSpread: boolean };
+
 	const result: string[] = [];
-	const restItems: string[] = [];
+	const restItems: RestItem[] = [];
 	const restArrays: string[] = [];
 
 	const params = checker.getResolvedSignature(callNode)?.parameters || [];
@@ -26,7 +28,7 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 
 	let remainingRequired = nonRestParamCount;
 
-	function pushArgs(...items: string[]) {
+	function pushArgs(fromSpread: boolean, ...items: string[]) {
 		for (const item of items) {
 			if (remainingRequired > 0) {
 				result.push(item);
@@ -34,14 +36,14 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 				continue;
 			}
 
-			restItems.push(item);
+			restItems.push({ text: item, fromSpread });
 		}
 	}
 
 	for (const arg of args) {
 		// Handle non-spread arguments
 		if (!ts.isSpreadElement(arg)) {
-			pushArgs(NodeHandler.handle(arg));
+			pushArgs(false, NodeHandler.handle(arg));
 			continue;
 		}
 
@@ -56,7 +58,7 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 			if (outArrs.length > 1)
 				throw "The transpiler can't handle it yet if there are nested spread elements as parameters";
 
-			pushArgs(...arrayItems);
+			pushArgs(true, ...arrayItems);
 			continue;
 		}
 
@@ -78,7 +80,7 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 		}
 
 		if (restItems.length) {
-			restArrays.push(`[${restItems.join(",")}]`);
+			restArrays.push(`[${restItems.map(el => el.text).join(",")}]`);
 			restItems.length = 0;
 		}
 
@@ -87,13 +89,13 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 
 	if (restItems.length) {
 		if (remainingRequired > 0 || !hasRestParameter) {
-			result.push(...restItems);
+			result.push(...restItems.map(el => el.text));
 		}
 		else {
 			const processedItems: string[] = [];
 			for (const item of restItems) {
-				if (!item.startsWith("[") || !item.endsWith("]")) {
-					processedItems.push(item);
+				if (!item.fromSpread || !item.text.startsWith("[") || !item.text.endsWith("]")) {
+					processedItems.push(item.text);
 					continue;
 				}
 
@@ -101,10 +103,11 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 					restArrays.push(`[${processedItems.join(",")}]`);
 					processedItems.length = 0;
 				}
-				restArrays.push(item);
+				restArrays.push(item.text);
 			}
 
-			if (processedItems.length) restArrays.push(`[${processedItems.join(",")}]`);
+			if (processedItems.length)
+				restArrays.push(`[${processedItems.join(",")}]`);
 		}
 	}
 

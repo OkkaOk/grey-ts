@@ -24,8 +24,8 @@ describe("Shims", () => {
 
 	test("Array.concat", () => {
 		expect(
-			transpileString("const myArr = [1,2,3].concat([4,5,6])")
-		).toInclude(`myArr = array_concat([1,2,3], [4,5,6])`);
+			transpileString("const myArr = [1,2,3].concat([4,5,6], 7)")
+		).toInclude(`myArr = array_concat([1,2,3], [[4,5,6],7])`);
 	});
 
 	test("Math.sqrt", () => {
@@ -80,8 +80,8 @@ describe("Spread", () => {
 		expect(
 			transpileString([
 				"const myArr = [1,2,3]",
-				"const result = Math.max(...myArr)",
+				"const result = Math.max(...myArr, 4, 5, ...myArr)",
 			].join("\n"))
-		).toContain("result = math_max(myArr)");
+		).toContain("result = math_max(myArr + [4,5] + myArr)");
 	});
 });
