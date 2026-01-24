@@ -196,7 +196,7 @@ export const utilFunctions = {
 	"array_push": [
 		"array_push = function(target, items)",
 		"	for item in items",
-		"		target.push(item)",
+		"		target.push(@item)",
 		"	end for",
 		"	return target.len",
 		"end function"
@@ -205,7 +205,7 @@ export const utilFunctions = {
 		"array_unshift = function(target, items)",
 		"	if not items.len then return target.len",
 		"	for i in range(items.len-1)",
-		"		target.insert(0, items[i])",
+		"		target.insert(0, @items[i])",
 		"	end for",
 		"	return target.len",
 		"end function"

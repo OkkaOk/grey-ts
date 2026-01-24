@@ -91,7 +91,7 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 		else {
 			const processedItems: string[] = [];
 			for (const item of restItems) {
-				if (item[0] !== "[") {
+				if (!item.startsWith("[") || !item.endsWith("]")) {
 					processedItems.push(item);
 					continue;
 				}
@@ -275,7 +275,7 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 		return `-${operand}`;
 
 	if (operator === "+")
-		return `${operand}.val()`;
+		return `str(${operand}).val()`;
 
 	if (operator === "~")
 		return `bitwise("~", ${operand})`;
