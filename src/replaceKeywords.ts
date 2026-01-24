@@ -197,6 +197,8 @@ export const propertyAccessReplacements: Record<string, string> = {
 	"Math.round": "round",
 	"Math.random": "rnd",
 	"Math.log": "log",
+	"console.log": "print",
+	"console.clear": "clear_screen",
 	"String.prototype": "string",
 	"Number.prototype": "number",
 	"Boolean.prototype": "number", // No boolean in GreyScript

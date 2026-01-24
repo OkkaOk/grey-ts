@@ -6,15 +6,19 @@ import { NodeHandler } from "./nodeHandler.js";
 import parseCode from "./parser.js";
 import { findProjectRoot } from "./utils.js";
 
-import "../src/visitors/assignments.js";
-import "../src/visitors/classes.js";
-import "../src/visitors/expressions.js";
-import "../src/visitors/functions.js";
-import "../src/visitors/identifiers.js";
-import "../src/visitors/imports.js";
-import "../src/visitors/objects.js";
-import "../src/visitors/statements.js";
-import "../src/visitors/variables.js";
+import "./visitors/assignments.js";
+import "./visitors/classes.js";
+import "./visitors/expressions.js";
+import "./visitors/functions.js";
+import "./visitors/identifiers.js";
+import "./visitors/imports.js";
+import "./visitors/objects.js";
+import "./visitors/statements.js";
+import "./visitors/variables.js";
+
+import "./call_transformers/array";
+import "./call_transformers/object";
+import "./call_transformers/string";
 
 type Mode = "ts" | "js";
 

@@ -1,6 +1,6 @@
 
 import ts from "typescript";
-import { CallTransformer } from "../callTransformer";
+import { CallTransformer } from "../call_transformers/callTransformer";
 import { NodeHandler } from "../nodeHandler";
 import { calledUtilFunctions, checker, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
