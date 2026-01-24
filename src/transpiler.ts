@@ -162,7 +162,7 @@ export const utilFunctions = {
 	].join("\n"),
 	"array_push": [
 		"array_push = function(target, items)",
-		"	for item in items",
+		"	for item in items[:]",
 		"		target.push(@item)",
 		"	end for",
 		"	return target.len",
