@@ -47,8 +47,9 @@ export const utilFunctions = {
 		"	while isaobj.hasIndex(\"__isa\")",
 		"		isaobj = obj[\"__isa\"]",
 		"		if isaobj.hasIndex(key) then",
-		"			val = obj[key]",
-		"			return val", // Doesn't seem to like obj[key]() so this is a workaround
+		"			res = obj[key]",
+		"			if typeof(@res) == \"function\" and str(@res)[8:][1:-1].indexOf(\"self\") == 0 then return res(obj)",
+		"			return obj[key]",
 		"		end if",
 		"	end while",
 		"	return null",
