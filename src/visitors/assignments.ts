@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { NodeHandler } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
 import { asRef, nodeIsFunctionReference } from "../utils";
 
 NodeHandler.register(ts.SyntaxKind.PropertyAssignment, (node: ts.PropertyAssignment) => {

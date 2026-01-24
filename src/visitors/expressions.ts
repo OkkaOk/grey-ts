@@ -1,7 +1,8 @@
 
 import ts from "typescript";
 import { CallTransformer } from "../callTransformer";
-import { calledUtilFunctions, checker, NodeHandler, type TranspileContext } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+import { calledUtilFunctions, checker, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
 /** Check if the last parameter is a rest parameter */

@@ -1,5 +1,6 @@
 import ts from "typescript";
-import { NodeHandler } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+
 
 NodeHandler.register(ts.SyntaxKind.ClassDeclaration, (node: ts.ClassDeclaration) => {
 	if (node.modifiers?.some(m => m.kind === ts.SyntaxKind.DeclareKeyword))

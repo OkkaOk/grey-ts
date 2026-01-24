@@ -1,6 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
-import { NodeHandler, program, transpileSourceFile, type TranspileContext } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+import { program, transpileSourceFile, type TranspileContext } from "../transpiler";
 
 function importFile(filePath: string, ctx: TranspileContext, returnResult?: boolean): string {
 	let srcPath = path.resolve(ctx.currentFolder, filePath);

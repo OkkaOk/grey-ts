@@ -1,14 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { transpileString } from "../src/transpiler";
-import "../src/visitors/assignments.js";
-import "../src/visitors/classes.js";
-import "../src/visitors/expressions.js";
-import "../src/visitors/functions.js";
-import "../src/visitors/identifiers.js";
-import "../src/visitors/imports.js";
-import "../src/visitors/objects.js";
-import "../src/visitors/statements.js";
-import "../src/visitors/variables.js";
 
 describe("Identifiers", () => {
 	test("hostComputer", () => {

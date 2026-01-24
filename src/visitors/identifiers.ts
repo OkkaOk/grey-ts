@@ -1,5 +1,6 @@
 import ts from "typescript";
-import { checker, NodeHandler } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+import { checker } from "../transpiler";
 import { asRef, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
 NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {

@@ -1,5 +1,6 @@
 import ts from "typescript";
-import { checker, NodeHandler, type TranspileContext } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+import { checker, type TranspileContext } from "../transpiler";
 import { asRef, nodeIsFunctionReference } from "../utils";
 
 function handleVariableDeclaration(

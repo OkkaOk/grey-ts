@@ -1,6 +1,7 @@
 {
 	"name": "@grey-ts/transpiler",
 	"version": "0.3.1",
+	"description": "Transpiles TypeScript into GreyScript",
 	"author": "Okka",
 	"module": "src/index.ts",
 	"bin": {

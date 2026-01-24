@@ -1,5 +1,6 @@
 import ts from "typescript";
-import { createAnonFunction, NodeHandler } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+import { createAnonFunction } from "../transpiler";
 
 function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray<ts.ParameterDeclaration>; }) {
 	const params = node.parameters.map(param => NodeHandler.handle(param)).join(", ");

@@ -2,8 +2,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript";
 
+import { NodeHandler } from "./nodeHandler.js";
 import parseCode from "./parser.js";
 import { findProjectRoot } from "./utils.js";
+
+import "../src/visitors/assignments.js";
+import "../src/visitors/classes.js";
+import "../src/visitors/expressions.js";
+import "../src/visitors/functions.js";
+import "../src/visitors/identifiers.js";
+import "../src/visitors/imports.js";
+import "../src/visitors/objects.js";
+import "../src/visitors/statements.js";
+import "../src/visitors/variables.js";
 
 type Mode = "ts" | "js";
 
@@ -17,50 +28,6 @@ export type TranspileContext = {
 	visitedFiles: Record<string, boolean>;
 	output: string[];
 };
-
-type HandlerType<T extends ts.Node> = (node: T, ctx: TranspileContext, ...extraArgs: any[]) => string;
-export class NodeHandler {
-	static handlers: Map<ts.SyntaxKind, HandlerType<any>> = new Map();
-	static transpileContext: TranspileContext;
-
-	static register<T extends ts.Node>(kind: T["kind"], handler: HandlerType<T>) {
-		if (this.handlers.has(kind))
-			throw `${ts.SyntaxKind[kind]} (${kind}) is already registered`;
-
-		this.handlers.set(kind, handler);
-	}
-
-	static handle(node: ts.Node): string {
-		const handler = this.handlers.get(node.kind);
-		if (!handler) {
-			console.log(`Unsupported syntax ${ts.SyntaxKind[node.kind]} (kind ${node.kind}) was not transpiled: ${node.getText()}`);
-			this.printLineAndCol(node);
-			return "null";
-		}
-
-		// console.log(ts.SyntaxKind[node.kind], node.kind, node.getText());
-		try {
-			const result = handler(node, this.transpileContext);
-			return result;
-		} catch (error) {
-			console.error(error);
-
-			this.printLineAndCol(node);
-			return "null";
-		}
-	}
-
-	private static printLineAndCol(node: ts.Node) {
-		const source = node.getSourceFile();
-		const lineAndChar = source.getLineAndCharacterOfPosition(node.pos);
-		console.log(`At ${source.fileName}: line ${lineAndChar.line + 1}, col ${lineAndChar.character + 1}`);
-	}
-}
-
-NodeHandler.register(ts.SyntaxKind.TypeAliasDeclaration, () => "");
-NodeHandler.register(ts.SyntaxKind.InterfaceDeclaration, () => "");
-NodeHandler.register(ts.SyntaxKind.EndOfFileToken, () => "");
-NodeHandler.register(ts.SyntaxKind.EmptyStatement, () => "");
 
 export let program: ts.Program;
 export let checker: ts.TypeChecker;
@@ -205,7 +172,7 @@ export const utilFunctions = {
 		"array_unshift = function(target, items)",
 		"	if not items.len then return target.len",
 		"	for i in range(items.len-1)",
-		"		target.insert(0, @items[i])",
+		"		target.insert(0, @items[i])", // Perhaps @ not needed 
 		"	end for",
 		"	return target.len",
 		"end function"

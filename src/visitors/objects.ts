@@ -1,5 +1,6 @@
 import ts from "typescript";
-import { NodeHandler, checker, type TranspileContext } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+import { checker, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess } from "../utils";
 
 const assignmentOperators = new Set<string>([
