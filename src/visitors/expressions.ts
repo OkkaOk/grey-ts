@@ -115,6 +115,9 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 		result.push(restArrays.join(" + "));
 	}
 
+	if (hasRestParameter && result.length === params.length - 1)
+		result.push("[]");
+
 	return result;
 }
 
