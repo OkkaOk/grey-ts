@@ -10,7 +10,11 @@ function handleVariableDeclaration(
 	const left = NodeHandler.handle(node.name);
 	const initializerType = node.initializer ? checker.getTypeAtLocation(node.initializer) : undefined;
 
-	if (ts.isPropertyDeclaration(node) && initializerType?.flags === ts.TypeFlags.Object) {
+	if (
+		ts.isPropertyDeclaration(node) &&
+		initializerType?.flags === ts.TypeFlags.Object &&
+		!node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.StaticKeyword)
+	) {
 		console.warn(`You shouldn't initialize '${left}' with an Array or an Object because in GreyScript, every instantiation refers to the same '${left}' variable.\nInitialize them in the constructor instead`);
 	}
 
