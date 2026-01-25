@@ -39,7 +39,14 @@ NodeHandler.register(ts.SyntaxKind.Parameter, (node: ts.ParameterDeclaration) =>
 	const name = NodeHandler.handle(node.name);
 	if (!node.initializer) return name;
 
-	return `${name} = ${NodeHandler.handle(node.initializer)}`;
+	const initializer = NodeHandler.handle(node.initializer);
+
+	const initializerType = checker.getTypeAtLocation(node.initializer);
+	if (initializerType.flags === ts.TypeFlags.Object) {
+		throw `You can't initialize parameter '${name}' with an Array or an Object as that won't work in GreyScript and it would be null`;
+	}
+
+	return `${name} = ${initializer}`;
 });
 
 NodeHandler.register(ts.SyntaxKind.NumericLiteral, (node: ts.NumericLiteral) => node.text);
