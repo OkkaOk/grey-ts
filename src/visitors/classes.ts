@@ -33,8 +33,21 @@ NodeHandler.register(ts.SyntaxKind.Constructor, (node: ts.ConstructorDeclaration
 	if (!node.body)
 		return "";
 
-	const params = node.parameters.map(param => NodeHandler.handle(param)).join(", ");
-	const body = NodeHandler.handle(node.body);
+	const declaredProperties: string[] = [];
+
+	const params = node.parameters.map(param => {
+		const res = NodeHandler.handle(param);
+
+		if (param.modifiers) {
+			const paramName = NodeHandler.handle(param.name);
+			const declaration = `\tself.${paramName} = ${paramName}`;
+			declaredProperties.push(declaration);
+		}
+
+		return res;
+	}).join(", ");
+
+	const body = (declaredProperties.length ? declaredProperties.join("\n") + "\n" : "") + NodeHandler.handle(node.body);
 
 	return `constructor = function(${params})\n${body}\n\treturn self\nend function`;
 });
