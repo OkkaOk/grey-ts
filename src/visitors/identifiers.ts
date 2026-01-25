@@ -51,11 +51,25 @@ NodeHandler.register(ts.SyntaxKind.Parameter, (node: ts.ParameterDeclaration) =>
 
 NodeHandler.register(ts.SyntaxKind.NumericLiteral, (node: ts.NumericLiteral) => node.text);
 NodeHandler.register(ts.SyntaxKind.StringLiteral, (node: ts.StringLiteral) => `"${transformString(node.text)}"`);
-NodeHandler.register(ts.SyntaxKind.ThisKeyword, () => "self");
 NodeHandler.register(ts.SyntaxKind.NullKeyword, () => "null");
 NodeHandler.register(ts.SyntaxKind.UndefinedKeyword, () => "null");
 NodeHandler.register(ts.SyntaxKind.FalseKeyword, () => "0");
 NodeHandler.register(ts.SyntaxKind.TrueKeyword, () => "1");
+NodeHandler.register(ts.SyntaxKind.ThisKeyword, (node: ts.ThisExpression) => {
+	const propDeclarationAncestor = ts.findAncestor(node.parent, (n) => ts.isPropertyDeclaration(n));
+
+	// For example in a class we declare
+	// myValue = 3;
+	// myValue2 = this.myValue * 2;
+	// We need to change the 'this' of myValue2's initializer to the class' name as we can't access 'self' in greyscript here
+	if (propDeclarationAncestor) {
+		if (!propDeclarationAncestor.parent.name)
+			throw `Can't handle this 'this' keyword becuase the class doesn't have a name and it's needed for this case`;
+		return propDeclarationAncestor.parent.name.text;
+	}
+	
+	return "self";
+});
 
 NodeHandler.register(ts.SyntaxKind.SuperKeyword, (node: ts.SuperExpression) => {
 	if (ts.isPropertyAccessExpression(node.parent)) return "super";
