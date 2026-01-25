@@ -72,7 +72,7 @@ NodeHandler.register(ts.SyntaxKind.ThisKeyword, (node: ts.ThisExpression) => {
 });
 
 NodeHandler.register(ts.SyntaxKind.SuperKeyword, (node: ts.SuperExpression) => {
-	if (ts.isPropertyAccessExpression(node.parent)) return "super";
+	if (ts.isPropertyAccessExpression(node.parent) || ts.isElementAccessExpression(node.parent)) return "super";
 	return "super.constructor";
 });
 
