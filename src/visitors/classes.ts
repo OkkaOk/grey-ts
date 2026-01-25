@@ -47,7 +47,20 @@ NodeHandler.register(ts.SyntaxKind.Constructor, (node: ts.ConstructorDeclaration
 		return res;
 	}).join(", ");
 
-	const body = (declaredProperties.length ? declaredProperties.join("\n") + "\n" : "") + NodeHandler.handle(node.body);
+	let body = NodeHandler.handle(node.body);
+	if (declaredProperties.length) {
+		const propertiesStr = declaredProperties.join("\n");
+
+		const lines = body.split("\n");
+		const superIndex = lines.findIndex(line => line.includes("super.constructor"));
+
+		if (superIndex !== -1) {
+			body = `${lines.slice(0, superIndex + 1).join("\n")}\n${propertiesStr}\n${lines.slice(superIndex + 1).join("\n")}`;
+		}
+		else {
+			body = `${propertiesStr}\n${body}`;
+		}
+	}
 
 	return `constructor = function(${params})\n${body}\n\treturn self\nend function`;
 });
