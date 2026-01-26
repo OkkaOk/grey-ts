@@ -3,7 +3,7 @@ import { NodeHandler } from "../nodeHandler";
 import { checker, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess } from "../utils";
 
-const assignmentOperators = new Set<string>([
+export const assignmentOperators = new Set<string>([
 	"=", "??=", "||=", "-=", "+="
 ]);
 

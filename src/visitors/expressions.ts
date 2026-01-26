@@ -4,6 +4,7 @@ import { CallTransformer } from "../call_transformers/callTransformer";
 import { NodeHandler } from "../nodeHandler";
 import { calledUtilFunctions, checker, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
+import { assignmentOperators } from "./objects";
 
 /** Check if the last parameter is a rest parameter */
 function hasRestParam(params: readonly ts.Symbol[]): boolean {
@@ -16,7 +17,7 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 	const args = callNode.arguments;
 	if (!args) return [];
 
-	type RestItem = { text: string, fromSpread: boolean };
+	type RestItem = { text: string, fromSpread: boolean; };
 
 	const result: string[] = [];
 	const restItems: RestItem[] = [];
@@ -159,6 +160,36 @@ NodeHandler.register(ts.SyntaxKind.NewExpression, (node: ts.NewExpression, ctx) 
 	return output;
 });
 
+function shouldHaveOuterPrefix(node: ts.BinaryExpression, operator: string): boolean {
+	// Only assigning has to be considered, reading is fine even without
+	if (!assignmentOperators.has(operator))
+		return false;
+
+	// Works for property access as well without the outer prefix. Identifiers are the only problem
+	if (!ts.isIdentifier(node.left))
+		return false;
+
+	// Check if we're inside a nested function
+
+	const functionAncestor = ts.findAncestor(node.parent, n => ts.isFunctionLike(n));
+	// We're not inside a function, so it's safe to assume the identifier doesn't need the prefix
+	if (!functionAncestor) 
+		return false;
+
+	// It's just a single function, not a nested one
+	if (!ts.findAncestor(functionAncestor.parent, n => ts.isFunctionLike(n)))
+		return false;
+
+	const leftSymbol = checker.getSymbolAtLocation(node.left);
+
+	// The symbol doesn't seem to have a declaration, typescript should complain about it
+	if (!leftSymbol?.valueDeclaration)
+		return false;
+
+	// Symbols position is outside this function's boundary
+	return (leftSymbol.valueDeclaration.pos < functionAncestor.pos || leftSymbol.valueDeclaration.pos > functionAncestor.end);
+}
+
 NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression) => {
 	// console.log(ts.SyntaxKind[node.parent.kind], node.getText())
 	let operatorToken = getOperatorToken(node.operatorToken) || node.operatorToken.getText();
@@ -196,6 +227,10 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 	}
 
 	let left = NodeHandler.handle(node.left);
+
+	if (shouldHaveOuterPrefix(node, operatorToken))
+		left = "outer." + left;
+
 	if (nodeIsFunctionReference(node.left))
 		left = asRef(left);
 
@@ -210,11 +245,11 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 			throw `Can't handle this 'instanceof' operator because '${right}' doesn't have a 'classID' member, which is needed in GreyScript to check a type`;
 		}
 
-		const declaration = classIdMember.valueDeclaration as ts.PropertyDeclaration | undefined
+		const declaration = classIdMember.valueDeclaration as ts.PropertyDeclaration | undefined;
 		if (!declaration || !("initializer" in declaration) || !declaration.initializer) {
 			throw `The 'classID' property of '${right}' isn't initialized`;
 		}
-		
+
 		return `${left}.classID == typeof(${right})`;
 	}
 
