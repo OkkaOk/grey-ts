@@ -2,19 +2,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript";
 
-import { NodeHandler } from "./nodeHandler.js";
-import parseCode from "./parser.js";
-import { findProjectRoot } from "./utils.js";
+import { NodeHandler } from "./nodeHandler";
+import parseCode from "./parser";
+import { findProjectRoot } from "./utils";
 
-import "./visitors/assignments.js";
-import "./visitors/classes.js";
-import "./visitors/expressions.js";
-import "./visitors/functions.js";
-import "./visitors/identifiers.js";
-import "./visitors/imports.js";
-import "./visitors/objects.js";
-import "./visitors/statements.js";
-import "./visitors/variables.js";
+import "./visitors/assignments";
+import "./visitors/classes";
+import "./visitors/expressions";
+import "./visitors/functions";
+import "./visitors/identifiers";
+import "./visitors/imports";
+import "./visitors/objects";
+import "./visitors/statements";
+import "./visitors/variables";
 
 import "./call_transformers/array";
 import "./call_transformers/object";

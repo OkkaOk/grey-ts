@@ -2,8 +2,8 @@
 
 import * as fs from "node:fs";
 import path from "node:path";
-import { transpileProgram } from "./transpiler.js";
-import { findProjectRoot } from "./utils.js";
+import { transpileProgram } from "./transpiler";
+import { findProjectRoot } from "./utils";
 
 let noMoreFlags = false;
 let command = "";
