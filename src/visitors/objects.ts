@@ -36,10 +36,6 @@ NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyA
 	if (ctx.namespaceImports[ctx.currentFilePath]?.has(left))
 		return right;
 
-	// if (node.questionDotToken) {
-
-	// }
-
 	let getSafely = !!node.questionDotToken && !ts.isNonNullExpression(node.parent);
 
 	const rightType = checker.getTypeAtLocation(node.name);
@@ -78,16 +74,7 @@ NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAcc
 		right = NodeHandler.handle(node.argumentExpression);
 	}
 
-	const asd = ts.findAncestor(node, ancestor => {
-		if (ancestor.parent && ts.isBinaryExpression(ancestor.parent) && ancestor === ancestor.parent.left) {
-			const token = ts.tokenToString(ancestor.parent.operatorToken.kind) || ancestor.parent.operatorToken.getText();
-			return assignmentOperators.has(token);
-		}
-
-		return false;
-	});
-
-	if (!asd && !ts.isNumericLiteral(node.argumentExpression)) {
+	if (!valueIsBeingAssignedToNode(node) && !ts.isNumericLiteral(node.argumentExpression)) {
 		return callUtilFunction("get_property", left, `${right}`);
 	}
 
