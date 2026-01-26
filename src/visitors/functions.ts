@@ -10,7 +10,6 @@ function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray
 }
 
 NodeHandler.register(ts.SyntaxKind.Block, (node: ts.Block) => {
-	// TODO: assignments to variables outside of the function need to be prefixed with outer.
 	const output = node.statements.map(val => {
 		let statement = NodeHandler.handle(val);
 		statement = statement.split("\n").map(line => "\t" + line).join("\n");
@@ -30,7 +29,6 @@ NodeHandler.register(ts.SyntaxKind.MethodDeclaration, (node: ts.MethodDeclaratio
 });
 
 NodeHandler.register(ts.SyntaxKind.FunctionDeclaration, (node: ts.FunctionDeclaration,) => {
-	// TODO: confirm this
 	// Is a function overload.
 	if (!node.body)
 		return "";
