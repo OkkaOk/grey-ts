@@ -44,7 +44,10 @@ NodeHandler.register(ts.SyntaxKind.PropertyDeclaration, handleVariableDeclaratio
 
 NodeHandler.register<ts.EnumDeclaration>(ts.SyntaxKind.EnumDeclaration, (node) => {
 	const members = node.members.map((member, index) => {
-		const name = NodeHandler.handle(member.name);
+		let name = NodeHandler.handle(member.name);
+		if (!ts.isStringLiteral(member.name))
+			name = `"${name}"`;
+
 		if (member.initializer) {
 			return `${name}: ${NodeHandler.handle(member.initializer)}`;
 		}
