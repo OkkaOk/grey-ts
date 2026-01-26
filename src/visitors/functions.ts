@@ -48,7 +48,7 @@ NodeHandler.register(ts.SyntaxKind.ArrowFunction, (node: ts.ArrowFunction) => {
 		return "@" + createAnonFunction(body, params).name;
 	}
 
-	if (ts.isPropertyAssignment(node.parent) || ts.isVariableDeclaration(node.parent) || ts.isBinaryExpression(node.parent) || ts.isReturnStatement(node.parent)) {
+	if (ts.hasOnlyExpressionInitializer(node.parent) || ts.isBinaryExpression(node.parent) || ts.isReturnStatement(node.parent)) {
 		return `function(${params.join(", ")})\n${body}\nend function`;
 	}
 

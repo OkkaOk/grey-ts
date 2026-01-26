@@ -99,7 +99,7 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 	outObjects ??= [];
 	funcs ??= [];
 
-	const objectName = ts.isVariableDeclaration(node.parent) ? NodeHandler.handle(node.parent.name) :
+	const objectName = ts.hasOnlyExpressionInitializer(node.parent) ? NodeHandler.handle(node.parent.name) :
 		ts.isBinaryExpression(node.parent) && node === node.parent.right ? NodeHandler.handle(node.parent.left) : "";
 
 	function pushObj() {
