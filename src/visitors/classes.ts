@@ -13,18 +13,19 @@ NodeHandler.register(ts.SyntaxKind.ClassDeclaration, (node: ts.ClassDeclaration)
 	if (extensions && extensions.length && extensions[0]!.types.length)
 		output = `${name} = new ${NodeHandler.handle(extensions[0]!.types[0]!.expression)}`;
 
+	let hasConstructor = false;
 	for (const member of node.members) {
-		if (ts.isMethodDeclaration(member) || ts.isConstructorDeclaration(member)) {
-			if (!member.body)
-				continue;
+		if (ts.isFunctionLike(member) && ("body" in member) && !member.body)
+			continue;
 
-			output += `\n${name}.${NodeHandler.handle(member)}`;
-		} else if (ts.isPropertyDeclaration(member)) {
-			output += `\n${name}.${NodeHandler.handle(member)}`;
-		} else {
-			output += `\n${name}.${NodeHandler.handle(member)}`;
-		}
+		if (ts.isConstructorDeclaration(member))
+			hasConstructor = true;
+
+		output += `\n${name}.${NodeHandler.handle(member)}`;
 	}
+
+	if (!hasConstructor && !node.modifiers?.some(m => m.kind === ts.SyntaxKind.AbstractKeyword))
+		output += `\n${name}.constructor = function\n\treturn self\nend function`;
 
 	return output;
 });
