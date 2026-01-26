@@ -13,10 +13,19 @@ NodeHandler.register(ts.SyntaxKind.ClassDeclaration, (node: ts.ClassDeclaration)
 	if (extensions && extensions.length && extensions[0]!.types.length)
 		output = `${name} = new ${NodeHandler.handle(extensions[0]!.types[0]!.expression)}`;
 
+	const declaredNames = new Set<string>();
+
 	let hasConstructor = false;
 	for (const member of node.members) {
 		if (ts.isFunctionLike(member) && ("body" in member) && !member.body)
 			continue;
+
+		if (member.name) {
+			const memberName = NodeHandler.handle(member.name);
+			if (declaredNames.has(memberName))
+				throw `The transpiled version of class '${name}' has a duplicate member '${memberName}'.\nModifiers such as 'static' are only for TypeScript for now and are not differentiated in the transpiled version from normal declarations for now`;
+			declaredNames.add(memberName);
+		}
 
 		if (ts.isConstructorDeclaration(member))
 			hasConstructor = true;
