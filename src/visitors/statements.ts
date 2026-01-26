@@ -24,11 +24,14 @@ NodeHandler.register(ts.SyntaxKind.ForStatement, (node: ts.ForStatement) => {
 		return false;
 	}
 
+	const labelIf = ts.isLabeledStatement(node.parent) ? `	if ${node.parent.label.text}Broke then break` : "";
+
 	if (!hasContinue(node)) {
 		return [
 			`${initializer}`,
 			`while ${condition}`,
 			`	${statement.trimStart()}`,
+			...(labelIf ? [labelIf] : []),
 			`	${incrementor}`,
 			`end while`
 		].join("\n");
@@ -46,6 +49,7 @@ NodeHandler.register(ts.SyntaxKind.ForStatement, (node: ts.ForStatement) => {
 		`	end if`,
 		`	${incrementedStateVarName} = 0`,
 		`	${statement.trimStart()}`,
+		...(labelIf ? [labelIf] : []),
 		`	${incrementor}`,
 		`	${incrementedStateVarName} = 1`,
 		`end while`,
@@ -66,7 +70,14 @@ NodeHandler.register(ts.SyntaxKind.ForOfStatement, (node: ts.ForOfStatement) => 
 	const varName = NodeHandler.handle(node.initializer.declarations[0]!.name);
 	const objToLoop = NodeHandler.handle(node.expression);
 
-	return `for ${varName} in ${objToLoop}\n${NodeHandler.handle(node.statement)}\nend for`;
+	const labelIf = ts.isLabeledStatement(node.parent) ? `	if ${node.parent.label.text}Broke then break` : "";
+
+	return [
+		`for ${varName} in ${objToLoop}`,
+		`${NodeHandler.handle(node.statement)}`,
+		...(labelIf ? [labelIf] : []),
+		`end for`
+	].join("\n");
 });
 
 NodeHandler.register(ts.SyntaxKind.ForInStatement, (node: ts.ForInStatement) => {
@@ -80,8 +91,14 @@ NodeHandler.register(ts.SyntaxKind.ForInStatement, (node: ts.ForInStatement) => 
 
 	const varName = NodeHandler.handle(node.initializer.declarations[0]!.name);
 	const objToLoop = NodeHandler.handle(node.expression);
+	const labelIf = ts.isLabeledStatement(node.parent) ? `	if ${node.parent.label.text}Broke then break` : "";
 
-	return `for ${varName} in ${objToLoop}.indexes\n${NodeHandler.handle(node.statement)}\nend for`;
+	return [
+		`for ${varName} in ${objToLoop}.indexes`,
+		`${NodeHandler.handle(node.statement)}`,
+		...(labelIf ? [labelIf] : []),
+		`end for`
+	].join("\n");
 });
 
 NodeHandler.register(ts.SyntaxKind.IfStatement, (node: ts.IfStatement) => {
@@ -114,22 +131,26 @@ NodeHandler.register(ts.SyntaxKind.IfStatement, (node: ts.IfStatement) => {
 
 NodeHandler.register(ts.SyntaxKind.WhileStatement, (node: ts.WhileStatement, ctx) => {
 	const expression = NodeHandler.handle(node.expression);
+	const labelIf = ts.isLabeledStatement(node.parent) ? `	if ${node.parent.label.text}Broke then break` : "";
 
 	return [
 		`while ${expression}`,
 		`	${NodeHandler.handle(node.statement).trimStart()}`,
+		...(labelIf ? [labelIf] : []),
 		`end while`
 	].join("\n");
 });
 
 NodeHandler.register(ts.SyntaxKind.DoStatement, (node: ts.DoStatement, ctx) => {
 	const expression = NodeHandler.handle(node.expression);
+	const labelIf = ts.isLabeledStatement(node.parent) ? `	if ${node.parent.label.text}Broke then break` : "";
 
 	return [
 		`did_once = 0`,
 		`while not did_once or ${expression}`,
 		`	did_once = 1`,
 		`	${NodeHandler.handle(node.statement).trimStart()}`,
+		...(labelIf ? [labelIf] : []),
 		`end while`
 	].join("\n");
 });
@@ -139,6 +160,12 @@ NodeHandler.register(ts.SyntaxKind.ContinueStatement, (node: ts.ContinueStatemen
 });
 
 NodeHandler.register(ts.SyntaxKind.BreakStatement, (node: ts.BreakStatement) => {
+	if (node.label) {
+		if (!ts.isBlock(node.parent))
+			throw "A break statement with a label must be in a block";
+
+		return `${NodeHandler.handle(node.label)}Broke = 1\nbreak`
+	}
 	return "break";
 });
 
@@ -156,5 +183,9 @@ NodeHandler.register(ts.SyntaxKind.ReturnStatement, (node: ts.ReturnStatement) =
 
 	return `return ${NodeHandler.handle(node.expression)}`;
 });
+
+NodeHandler.register<ts.LabeledStatement>(ts.SyntaxKind.LabeledStatement, (node) => {
+	return `${NodeHandler.handle(node.label)}Broke = 0\n${NodeHandler.handle(node.statement)}`;
+})
 
 // TODO: switch statement, maybe trycatch and throw somehow
