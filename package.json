@@ -40,6 +40,6 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"@grey-ts/types": "^2.0.0"
+		"@grey-ts/types": "^2.0.1"
 	}
 }

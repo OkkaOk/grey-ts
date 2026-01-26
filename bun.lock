@@ -5,7 +5,7 @@
     "": {
       "name": "@grey-ts/transpiler",
       "dependencies": {
-        "@grey-ts/types": "^1.5.0",
+        "@grey-ts/types": "^2.0.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -16,7 +16,7 @@
     },
   },
   "packages": {
-    "@grey-ts/types": ["@grey-ts/types@1.5.0", "", {}, "sha512-HDPal8xZM9tuT+rWhF054FYHXrBu65AX896+HfUppLY/BxOuAu0oJQkqGyr3MNloXHSEJMklrz/sJ0Lw4L3j/A=="],
+    "@grey-ts/types": ["@grey-ts/types@2.0.1", "", {}, "sha512-EeX8DuDN8II/IT0XPldCZ6D0D0xJ1ogGewfBWoH5mOuPpfGwLjE/1qg9de4cjQbjPq4CN4d1/vTJLXlDo7czCA=="],
 
     "@types/bun": ["@types/bun@1.3.6", "", { "dependencies": { "bun-types": "1.3.6" } }, "sha512-uWCv6FO/8LcpREhenN1d1b6fcspAB+cefwD7uti8C8VffIv0Um08TKMn98FynpTiU38+y2dUO55T11NgDt8VAA=="],
 
