@@ -173,7 +173,7 @@ function shouldHaveOuterPrefix(node: ts.BinaryExpression, operator: string): boo
 
 	const functionAncestor = ts.findAncestor(node.parent, n => ts.isFunctionLike(n));
 	// We're not inside a function, so it's safe to assume the identifier doesn't need the prefix
-	if (!functionAncestor) 
+	if (!functionAncestor)
 		return false;
 
 	// It's just a single function, not a nested one
@@ -190,15 +190,27 @@ function shouldHaveOuterPrefix(node: ts.BinaryExpression, operator: string): boo
 	return (leftSymbol.valueDeclaration.pos < functionAncestor.pos || leftSymbol.valueDeclaration.pos > functionAncestor.end);
 }
 
+function isAssignmentChain(node: ts.BinaryExpression, operator: string): boolean {
+	if (!assignmentOperators.has(operator))
+		return false;
+
+	if (ts.isBinaryExpression(node.right) && assignmentOperators.has(ts.tokenToString(node.right.operatorToken.kind) || ""))
+		return true;
+
+	if (ts.hasOnlyExpressionInitializer(node.parent))
+		return true;
+
+	return false;
+}
+
 NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression) => {
 	// console.log(ts.SyntaxKind[node.parent.kind], node.getText())
 	let operatorToken = getOperatorToken(node.operatorToken) || node.operatorToken.getText();
 
 	// Chained assignment are not a thing in GreyScript/MiniScript.
 	// TODO: Maybe figure out an alternative way or keep as is
-	if (operatorToken === "=" && ts.isBinaryExpression(node.right) && node.right.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-		throw "Assignment chaining is not supported";
-	}
+	if (isAssignmentChain(node, operatorToken))
+		throw `Assignment chaining is not supported`;
 
 	let right = NodeHandler.handle(node.right);
 	if (nodeIsFunctionReference(node.right))
@@ -234,7 +246,7 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 	if (nodeIsFunctionReference(node.left))
 		left = asRef(left);
 
-	if (operatorToken === "or" && (ts.isVariableDeclaration(node.parent) || ts.isPropertyAssignment(node.parent))) {
+	if (operatorToken === "or" && ts.hasOnlyExpressionInitializer(node.parent)) {
 		return callUtilFunction("or_op", left, right);
 	}
 
@@ -253,37 +265,29 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 		return `${left}.classID == typeof(${right})`;
 	}
 
-	if (operatorToken === "??") {
-		return callUtilFunction("nullish_coalescing_op", left, right);
+	switch (operatorToken) {
+		case "??":
+			return callUtilFunction("nullish_coalescing_op", left, right);
+		case "??=":
+			return `${left} = ${callUtilFunction("nullish_coalescing_op", left, right)}`;
+		case "in":
+			return `${right}.hasIndex(${left})`;
+		case "&":
+			return `bitwise("&", ${left}, ${right})`;
+		case "|":
+			return `bitwise("|", ${left}, ${right})`;
+		case "^":
+			return `bitwise("^", ${left}, ${right})`;
+		case "<<":
+			return `bitwise("<<", ${left}, ${right})`;
+		case ">>":
+			return `bitwise(">>", ${left}, ${right})`;
+		case ">>>":
+			return `bitwise(">>>", ${left}, ${right})`;
+		case "+=":
+		case "-=":
+			return `${left} = ${left} ${operatorToken[0]} ${right}`;
 	}
-	else if (operatorToken === "??=") {
-		return `${left} = ${callUtilFunction("nullish_coalescing_op", left, right)}`;
-	}
-	else if (operatorToken === "in") {
-		return `${right}.hasIndex(${left})`;
-	}
-	else if (operatorToken === "&") {
-		return `bitwise("&", ${left}, ${right})`;
-	}
-	else if (operatorToken === "|") {
-		return `bitwise("|", ${left}, ${right})`;
-	}
-	else if (operatorToken === "^") {
-		return `bitwise("^", ${left}, ${right})`;
-	}
-	else if (operatorToken === "<<") {
-		return `bitwise("<<", ${left}, ${right})`;
-	}
-	else if (operatorToken === ">>") {
-		return `bitwise(">>", ${left}, ${right})`;
-	}
-	else if (operatorToken === ">>>") {
-		return `bitwise(">>>", ${left}, ${right})`;
-	}
-
-	// console.log(checker.getTypeAtLocation(node.right).flags, ts.TypeFlags.Undefined)
-	if (operatorToken == "+=" || operatorToken == "-=")
-		return `${left} = ${left} ${operatorToken[0]} ${right}`;
 
 	if (operatorToken === "**")
 		operatorToken = "^";
