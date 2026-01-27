@@ -24,13 +24,13 @@ function handleVariableDeclaration(
 		right = asRef(right);
 	}
 
-	
+
 	return `${left} = ${right}`;
 }
 
 NodeHandler.register(ts.SyntaxKind.VariableDeclarationList, (node: ts.VariableDeclarationList, ctx) => {
 	return node.declarations.map(decl => handleVariableDeclaration(decl, ctx)).join("\n");
-})
+});
 
 NodeHandler.register(ts.SyntaxKind.VariableStatement, (node: ts.VariableStatement, ctx) => {
 	if (node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword))
@@ -43,22 +43,35 @@ NodeHandler.register(ts.SyntaxKind.VariableDeclaration, handleVariableDeclaratio
 NodeHandler.register(ts.SyntaxKind.PropertyDeclaration, handleVariableDeclaration);
 
 NodeHandler.register<ts.EnumDeclaration>(ts.SyntaxKind.EnumDeclaration, (node) => {
-	const members = node.members.map((member, index) => {
+	const members: string[] = [];
+
+	function addMember(name: string, initializer: string) {
+		members.push(`${name}: ${initializer}`);
+
+		if (isNaN(+initializer))
+			return;
+
+		members.push(`${initializer}: ${name}`);
+	}
+
+	node.members.forEach((member, index) => {
 		let name = NodeHandler.handle(member.name);
 		if (!ts.isStringLiteral(member.name))
 			name = `"${name}"`;
 
 		if (member.initializer) {
-			return `${name}: ${NodeHandler.handle(member.initializer)}`;
+			addMember(name, NodeHandler.handle(member.initializer));
+			return;
 		}
 
 		const type = checker.getTypeAtLocation(member);
 		if ("value" in type) {
-			return `${name}: ${type.value}`;
+			addMember(name, String(type.value));
+			return;
 		}
 
-		return `${name}: ${index}`;
+		addMember(name, index.toString());
 	});
 
 	return `${node.name.text} = { ${members.join(", ")} }`;
-})
+});
