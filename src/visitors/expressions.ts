@@ -430,13 +430,30 @@ NodeHandler.register(ts.SyntaxKind.AsExpression, (node: ts.AsExpression) => {
 });
 
 NodeHandler.register(ts.SyntaxKind.DeleteExpression, (node: ts.DeleteExpression) => {
-	if (!ts.isPropertyAccessExpression(node.expression))
-		throw `Cant handle delete expression for ${ts.SyntaxKind[node.expression.kind]}`;
+	if (ts.isPropertyAccessExpression(node.expression)) {
+		const pnode = node.expression;
+		const left = NodeHandler.handle(pnode.expression);
 
-	const pnode = node.expression;
-	const left = NodeHandler.handle(pnode.expression);
+		const leftType = checker.getTypeAtLocation(pnode.expression);
+		const right = replaceIdentifier(NodeHandler.handle(pnode.name), leftType, pnode.name.text);
+		return `${left}.remove("${right}")`;
+	}
 
-	const leftType = checker.getTypeAtLocation(pnode.expression);
-	const right = replaceIdentifier(NodeHandler.handle(pnode.name), leftType, pnode.name.text);
-	return `${left}.remove(${right})`;
+	if (ts.isElementAccessExpression(node.expression)) {
+		const pnode = node.expression;
+		const left = NodeHandler.handle(pnode.expression);
+
+		let right: string;
+		if (ts.isStringLiteral(pnode.argumentExpression)) {
+			const leftType = checker.getTypeAtLocation(pnode.expression);
+			right = `"${replaceIdentifier(pnode.argumentExpression.text, leftType, pnode.argumentExpression.text)}"`;
+		}
+		else {
+			right = NodeHandler.handle(pnode.argumentExpression);
+		}
+
+		return `${left}.remove(${right})`;
+	}
+
+	throw `Cant handle delete expression for ${ts.SyntaxKind[node.expression.kind]}`;
 });
