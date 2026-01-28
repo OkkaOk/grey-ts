@@ -42,5 +42,6 @@ export class NodeHandler {
 
 NodeHandler.register(ts.SyntaxKind.TypeAliasDeclaration, () => "");
 NodeHandler.register(ts.SyntaxKind.InterfaceDeclaration, () => "");
+NodeHandler.register(ts.SyntaxKind.ModuleDeclaration, () => "");
 NodeHandler.register(ts.SyntaxKind.EndOfFileToken, () => "");
 NodeHandler.register(ts.SyntaxKind.EmptyStatement, () => "");
