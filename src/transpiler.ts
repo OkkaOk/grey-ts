@@ -36,8 +36,132 @@ export type TranspileContext = {
 export let program: ts.Program;
 export let checker: ts.TypeChecker;
 
-const anonFunctions = new Map<string, string>();
-export const calledUtilFunctions = new Set<keyof typeof utilFunctions>();
+export const utilitiesToInsert = new Map<string, string>();
+
+export const extensionFunctions = {
+	"Array.map": [
+		"list.map = function(callback)",
+		"	index = 0",
+		"	out = []",
+		"	for item in self",
+		"		out.push(callback(item, index, self))",
+		"		index = index + 1",
+		"	end for",
+		"	return out",
+		"end function",
+	].join("\n"),
+	"Array.filter": [
+		"list.filter = function(predicate)",
+		"	index = 0",
+		"	out = []",
+		"	for item in self",
+		"		if predicate(item, index, self) then out.push(item)",
+		"		index = index + 1",
+		"	end for",
+		"	return out",
+		"end function",
+	].join("\n"),
+	"Array.find": [
+		"list.find = function(predicate)",
+		"	index = 0",
+		"	for item in self",
+		"		if predicate(item, index, self) then return item",
+		"		index = index + 1",
+		"	end for",
+		"	return null",
+		"end function",
+	].join("\n"),
+	"Array.some": [
+		"list.some = function(predicate)",
+		"	index = 0",
+		"	for item in self",
+		"		if predicate(item, index, self) then return 1",
+		"		index = index + 1",
+		"	end for",
+		"	return 0",
+		"end function",
+	].join("\n"),
+	"Array.every": [
+		"list.every = function(predicate)",
+		"	index = 0",
+		"	for item in self",
+		"		if not predicate(item, index, self) then return 0",
+		"		index = index + 1",
+		"	end for",
+		"	return 1",
+		"end function",
+	].join("\n"),
+	"Array.concat": [
+		"list.concat = function(items)",
+		"	out = self[0:]",
+		"	for item in items",
+		"		if item isa list then out = out + item else out.push(item)",
+		"	end for",
+		"	return out",
+		"end function"
+	].join("\n"),
+	"Array.push": [
+		"list.push_many = function(items)",
+		"	for item in items[:]",
+		"		self.push(@item)",
+		"	end for",
+		"	return self.len",
+		"end function"
+	].join("\n"),
+	"Array.unshift": [
+		"list.unshift = function(items)",
+		"	if not items.len then return self.len",
+		"	for i in range(items.len-1)",
+		"		self.insert(0, items[i])",
+		"	end for",
+		"	return self.len",
+		"end function"
+	].join("\n"),
+	"Array.reverse": [
+		"list.old_reverse = @list.reverse",
+		"list.reverse = function",
+		"	self.old_reverse",
+		"	return self",
+		"end function"
+	].join("\n"),
+	"String.startsWith": [
+		"string.startsWith = function(search, pos = 0)",
+		"	if pos < 0 then pos = 0",
+		"	return self.indexOf(search) == pos",
+		"end function",
+	].join("\n"),
+	"String.endsWith": [
+		"string.endsWith = function(search, pos = null)",
+		"	if pos == null then pos = self.len",
+		"	if pos < 0 then pos = 0",
+		"	return self.indexOf(search) + search.len == pos",
+		"end function",
+	].join("\n"),
+	"String.repeat": [
+		"string.repeatSelf = function(count = 0)",
+		"	return self * count",
+		"end function",
+	].join("\n"),
+	"Math.min": [
+		"Math.min = function(numbers)",
+		"	curr_min = null",
+		"	for num in numbers",
+		"		if curr_min == null or num < curr_min then curr_min = num",
+		"	end for",
+		"	return curr_min",
+		"end function"
+	].join("\n"),
+	"Math.max": [
+		"Math.max = function(numbers)",
+		"	curr_max = null",
+		"	for num in numbers",
+		"		if curr_max == null or num > curr_max then curr_max = num",
+		"	end for",
+		"	return curr_max",
+		"end function"
+	].join("\n"),
+};
+
 export const utilFunctions = {
 	"get_property": [
 		"get_property = function(obj, key)",
@@ -104,141 +228,21 @@ export const utilFunctions = {
 		"	return target",
 		"end function"
 	].join("\n"),
-	"array_map": [
-		"array_map = function(array, callback)",
-		"	index = 0",
-		"	out = []",
-		"	for item in array",
-		"		out.push(callback(item, index, array))",
-		"		index = index + 1",
-		"	end for",
-		"	return out",
-		"end function",
-	].join("\n"),
-	"array_filter": [
-		"array_filter = function(array, predicate)",
-		"	index = 0",
-		"	out = []",
-		"	for item in array",
-		"		if predicate(item, index, array) then out.push(item)",
-		"		index = index + 1",
-		"	end for",
-		"	return out",
-		"end function",
-	].join("\n"),
-	"array_find": [
-		"array_find = function(array, predicate)",
-		"	index = 0",
-		"	for item in array",
-		"		if predicate(item, index, array) then return item",
-		"		index = index + 1",
-		"	end for",
-		"	return null",
-		"end function",
-	].join("\n"),
-	"array_some": [
-		"array_some = function(array, predicate)",
-		"	index = 0",
-		"	for item in array",
-		"		if predicate(item, index, array) then return 1",
-		"		index = index + 1",
-		"	end for",
-		"	return 0",
-		"end function",
-	].join("\n"),
-	"array_every": [
-		"array_every = function(array, predicate)",
-		"	index = 0",
-		"	for item in array",
-		"		if not predicate(item, index, array) then return 0",
-		"		index = index + 1",
-		"	end for",
-		"	return 1",
-		"end function",
-	].join("\n"),
-	"array_concat": [
-		"array_concat = function(target, items)",
-		"	out = target[0:]",
-		"	for item in items",
-		"		if item isa list then out = out + item else out.push(item)",
-		"	end for",
-		"	return out",
-		"end function"
-	].join("\n"),
-	"array_push": [
-		"array_push = function(target, items)",
-		"	for item in items[:]",
-		"		target.push(@item)",
-		"	end for",
-		"	return target.len",
-		"end function"
-	].join("\n"),
-	"array_unshift": [
-		"array_unshift = function(target, items)",
-		"	if not items.len then return target.len",
-		"	for i in range(items.len-1)",
-		"		target.insert(0, @items[i])", // Perhaps @ not needed 
-		"	end for",
-		"	return target.len",
-		"end function"
-	].join("\n"),
-	"array_reverse": "array_reverse = function(arr)\n\tarr.reverse\n\treturn arr\nend function",
-	"str_starts_with": [
-		"str_starts_with = function(str, search, pos = 0)",
-		"	if pos < 0 then pos = 0",
-		"	return str.indexOf(search) == pos",
-		"end function",
-	].join("\n"),
-	"str_ends_with": [
-		"str_ends_with = function(str, search, pos = null)",
-		"	if pos == null then pos = str.len",
-		"	if pos < 0 then pos = 0",
-		"	return str.indexOf(search) + search.len == pos",
-		"end function",
-	].join("\n"),
-	"str_repeat": [
-		"str_repeat = function(str, count = 0)",
-		'	if count <= 0 then return ""',
-		"	if count == 1 then return str",
-		"	out = str",
-		"	for i in range(count-2)",
-		"		out = out + str",
-		"	end for",
-		"	return out",
-		"end function",
-	].join("\n"),
-	"math_min": [
-		"math_min = function(numbers)",
-		"	curr_min = null",
-		"	for num in numbers",
-		"		if curr_min == null or num < curr_min then curr_min = num",
-		"	end for",
-		"	return curr_min",
-		"end function"
-	].join("\n"),
-	"math_max": [
-		"math_max = function(numbers)",
-		"	curr_max = null",
-		"	for num in numbers",
-		"		if curr_max == null or num > curr_max then curr_max = num",
-		"	end for",
-		"	return curr_max",
-		"end function"
-	].join("\n"),
 	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif left == null then return @right\n\treturn @left\nend function",
 	"or_op": "or_op = function(left, right)\n\tif not left then return @right\n\treturn @left\nend function",
 	"is_type": "is_type = function(value, type)\n\tif typeof(value) == type then return 1\n\treturn 0\nend function",
 	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return when_true\n\treturn when_false\nend function",
+	...extensionFunctions
 };
 
 export function createAnonFunction(body: string, params: string[]) {
 	const defaultParams = new Array(3).fill(0).map((_, i) => `param${i}`);
 
-	const nextName = `func_${anonFunctions.size}`;
+	const nextName = `func_${utilitiesToInsert.size}`; // A unique name
 	const paramString = Object.assign(defaultParams, params).join(",");
 
 	const result = `${nextName} = function(${paramString})\n${body}\nend function`;
-	anonFunctions.set(nextName, result);
+	utilitiesToInsert.set(nextName, result);
 
 	return { name: nextName, str: result };
 }
@@ -275,16 +279,9 @@ export function transpileString(typescriptString: string) {
 
 	transpileSourceFile(sourceFile, ctx);
 
-	if (anonFunctions.size) {
-		for (const declaration of anonFunctions.values())
-			ctx.output.unshift(declaration);
-		anonFunctions.clear();
-	}
-
-	if (calledUtilFunctions.size) {
-		for (const call of calledUtilFunctions.keys())
-			ctx.output.unshift(utilFunctions[call]);
-		calledUtilFunctions.clear();
+	if (utilitiesToInsert.size) {
+		ctx.output.unshift(...utilitiesToInsert.values());
+		utilitiesToInsert.clear();
 	}
 
 	return ctx.output.join("\n");
@@ -357,16 +354,9 @@ export function transpileProgram(entryFileRelativePath: string) {
 	// 	output.push(result);
 	// }
 
-	if (anonFunctions.size) {
-		for (const declaration of anonFunctions.values())
-			ctx.output.unshift(declaration);
-		anonFunctions.clear();
-	}
-
-	if (calledUtilFunctions.size) {
-		for (const call of calledUtilFunctions.keys())
-			ctx.output.unshift(utilFunctions[call]);
-		calledUtilFunctions.clear();
+	if (utilitiesToInsert.size) {
+		ctx.output.unshift(...utilitiesToInsert.values());
+		utilitiesToInsert.clear();
 	}
 
 	console.log(`Transpiling took ${Date.now() - start} ms`);

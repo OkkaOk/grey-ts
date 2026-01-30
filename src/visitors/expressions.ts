@@ -2,7 +2,7 @@
 import ts from "typescript";
 import { CallTransformer } from "../call_transformers/callTransformer";
 import { NodeHandler } from "../nodeHandler";
-import { calledUtilFunctions, checker, type TranspileContext } from "../transpiler";
+import { checker, utilFunctions, utilitiesToInsert, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 import { assignmentOperators } from "./objects";
 
@@ -140,8 +140,8 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 	const transformed = CallTransformer.handle(symbolFullName, name, args, node, ctx);
 	if (transformed !== null) return transformed;
 
-	if (name === "is_type" && !calledUtilFunctions.has("is_type")) {
-		calledUtilFunctions.add("is_type");
+	if (name === "is_type" && !utilitiesToInsert.has("is_type")) {
+		utilitiesToInsert.set("is_type", utilFunctions["is_type"]);
 	}
 
 	if (!args.length)

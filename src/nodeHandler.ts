@@ -18,7 +18,7 @@ export class NodeHandler {
 		if (!handler) {
 			console.log(`Unsupported syntax ${ts.SyntaxKind[node.kind]} (kind ${node.kind}) was not transpiled: ${node.getText()}`);
 			this.printLineAndCol(node);
-			return "null";
+			return ts.isBlock(node.parent) || ts.isSourceFile(node.parent) ? "" : "null";
 		}
 
 		// console.log(ts.SyntaxKind[node.kind], node.kind, node.getText());
@@ -29,7 +29,7 @@ export class NodeHandler {
 			console.error(error);
 
 			this.printLineAndCol(node);
-			return "null";
+			return ts.isBlock(node.parent) || ts.isSourceFile(node.parent) ? "" : "null";
 		}
 	}
 

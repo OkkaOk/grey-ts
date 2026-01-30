@@ -174,11 +174,13 @@ export const apiNameMap: Record<string, string> = {
 	"String.length": "len",
 	"String.toLowerCase": "lower",
 	"String.toUpperCase": "upper",
+	"String.repeat": "repeatSelf",
 	// Object
 	"Object.size": "len",
 	// Array
 	"Array.length": "len",
 	"Array.shift": "pull",
+	"Array.push": "push_many"
 } as const;
 
 export const propertyAccessReplacements: Record<string, string> = {

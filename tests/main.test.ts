@@ -13,19 +13,13 @@ describe("Shims", () => {
 	test("Math.max", () => {
 		expect(
 			transpileString("const myMax = Math.max(6, 2, 8, 3)")
-		).toInclude(`myMax = math_max([6,2,8,3])`);
+		).toInclude(`myMax = Math.max([6,2,8,3])`);
 	});
 
 	test("Math.min", () => {
 		expect(
 			transpileString("const myMin = Math.min(6, 2, 8, 3)")
-		).toInclude(`myMin = math_min([6,2,8,3])`);
-	});
-
-	test("Array.concat", () => {
-		expect(
-			transpileString("const myArr = [1,2,3].concat([4,5,6], 7)")
-		).toInclude(`myArr = array_concat([1,2,3], [[4,5,6],7])`);
+		).toInclude(`myMin = Math.min([6,2,8,3])`);
 	});
 
 	test("Math.sqrt", () => {
@@ -39,6 +33,20 @@ describe("Shims", () => {
 			transpileString("const floored = Math.floor(3.7)")
 		).toEqual("floored = floor(3.7)");
 	});
+});
+
+describe("Arrays", () => {
+	test("Array.concat", () => {
+		expect(
+			transpileString("const myArr = [1,2,3].concat([4,5,6], 7)")
+		).toInclude(`myArr = [1,2,3].concat([[4,5,6],7])`);
+	});
+
+	// test("Array.push", () => {
+	// 	expect(
+	// 		transpileString("const myArr = [1,2,3]\nmyArr.push(4,5,6)")
+	// 	).toInclude(`myArr.push_many([4,5,6])`);
+	// });
 });
 
 describe("Functions", () => {
@@ -73,7 +81,7 @@ describe("Spread", () => {
 	test("Array literal spread in function call", () => {
 		expect(
 			transpileString("const result = Math.max(...[1, 2, 3, 4, 5])")
-		).toContain("result = math_max([1,2,3,4,5])");
+		).toContain("result = Math.max([1,2,3,4,5])");
 	});
 
 	test("Array variable spread in function call", () => {
@@ -82,6 +90,6 @@ describe("Spread", () => {
 				"const myArr = [1,2,3]",
 				"const result = Math.max(...myArr, 4, 5, ...myArr)",
 			].join("\n"))
-		).toContain("result = math_max(myArr + [4,5] + myArr)");
+		).toContain("result = Math.max(myArr + [4,5] + myArr)");
 	});
 });

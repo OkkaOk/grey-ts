@@ -3,7 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 import parseCode from "./parser";
 import { apiNameMap, propertyAccessReplacements } from "./replaceKeywords";
-import { calledUtilFunctions, checker, program, utilFunctions } from "./transpiler";
+import { checker, program, utilFunctions, utilitiesToInsert } from "./transpiler";
 
 const knownOperators = new Set([
 	"=", "+", "+=", "-", "-=", "++", "--", "**",
@@ -166,7 +166,7 @@ export function findProjectRoot(dir: string, fileToSearch = "package.json"): str
 }
 
 export function callUtilFunction(functionName: keyof typeof utilFunctions, ...params: string[]) {
-	calledUtilFunctions.add(functionName);
+	utilitiesToInsert.set(functionName, utilFunctions[functionName]);
 	return `${functionName}(${params.join(", ")})`;
 }
 

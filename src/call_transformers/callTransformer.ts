@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
-import { transpileSourceFile, type TranspileContext } from "../transpiler";
-import { callUtilFunction, getSourceFiles } from "../utils";
+import { transpileSourceFile, utilFunctions, utilitiesToInsert, type TranspileContext } from "../transpiler";
+import { getSourceFiles } from "../utils";
 
 type CallHandlerType = (functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext) => string;
 
@@ -16,6 +16,16 @@ export class CallTransformer {
 	}
 
 	static handle(symbolFullName: string, functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext): string | null {
+		if (symbolFullName in utilFunctions) {
+			if (symbolFullName.startsWith("Math"))
+				utilitiesToInsert.set("create_math", "Math = {}");
+			
+			utilitiesToInsert.set(symbolFullName, utilFunctions[symbolFullName as keyof typeof utilFunctions]);
+
+			const params = callArgs.length ? `(${callArgs.join(",")})` : "";
+			return `${functionName}${params}`;
+		}
+
 		const handler = this.handlers.get(symbolFullName);
 		if (!handler) return null;
 
@@ -32,15 +42,6 @@ CallTransformer.register("Function.toString", (name) => {
 	const func = name.slice(0, name.lastIndexOf("."));
 	return `str(@${func})`;
 });
-
-CallTransformer.register("Math.min", (name, args) => {
-	return callUtilFunction("math_min", `${args.join(",")}`);
-});
-
-CallTransformer.register("Math.max", (name, args) => {
-	return callUtilFunction("math_max", `${args.join(",")}`);
-});
-
 
 CallTransformer.register("GreyHack.include", (name, args, node, ctx) => {
 	if (!node.arguments.length) return "";
