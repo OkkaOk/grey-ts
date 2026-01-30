@@ -124,6 +124,29 @@ export const extensionFunctions = {
 		"	return self",
 		"end function"
 	].join("\n"),
+	"Array.includes": [
+		"list.includes = function(value, pos = 0)",
+		"	index = self.indexOf(value)",
+		"	if index == null then return false",
+		"	if pos < 0 then pos = 0",
+		"	return index >= pos",
+		"end function",
+	].join("\n"),
+	"Array.splice": [
+		"list.splice = function(start, count)",
+		"	deleted = []",
+		"	if start < 0 then start = self.len + start",
+		"	if start < 0 then start = 0",
+		"	if count == null then count = self.len - start",
+		"	if count <= 0 then return deleted",
+		"	while deleted.len < count",
+		"		if not self.hasIndex(start) then return deleted",
+		"		deleted.push(self[start])",
+		"		self.remove(start)",
+		"	end while",
+		"	return deleted",
+		"end function",
+	].join("\n"),
 	"String.startsWith": [
 		"string.startsWith = function(search, pos = 0)",
 		"	if pos < 0 then pos = 0",
@@ -140,6 +163,24 @@ export const extensionFunctions = {
 	"String.repeat": [
 		"string.repeatSelf = function(count = 0)",
 		"	return self * count",
+		"end function",
+	].join("\n"),
+	"String.includes": [
+		"string.includes = function(search, pos = 0)",
+		"	index = self.indexOf(search)",
+		"	if index == null then return false",
+		"	if pos < 0 then pos = 0",
+		"	return index >= pos",
+		"end function",
+	].join("\n"),
+	"String.trimStart": [
+		"string.trimStart = function()",
+		'	return self.replace("^\\s+", "")',
+		"end function",
+	].join("\n"),
+	"String.trimEnd": [
+		"string.trimEnd = function()",
+		'	return self.replace("\\s+$", "")',
 		"end function",
 	].join("\n"),
 	"Math.min": [
