@@ -147,6 +147,23 @@ export const extensionFunctions = {
 		"	return deleted",
 		"end function",
 	].join("\n"),
+	"Array.fill": [
+		"list.fill = function(value, start, endI)",
+		"	len = self.len",
+		"	if not len then return self",
+		"	if start == null then start = 0",
+		"	if endI == null then endI = len - 1",
+		"	if start < 0 then start = len + start",
+		"	if start < 0 then start = 0",
+		"	if endI < 0 then endI = len + endI",
+		"	if endI < 0 then endI = 0",
+		"	for i in range(start, endI-1, 1)",
+		"		if i >= len then break",
+		"		self[i] = value",
+		"	end for",
+		"	return self",
+		"end function",
+	].join("\n"),
 	"String.startsWith": [
 		"string.startsWith = function(search, pos = 0)",
 		"	if pos < 0 then pos = 0",
@@ -304,7 +321,6 @@ export const utilFunctions = {
 	"or_op": "or_op = function(left, right)\n\tif not left then return @right\n\treturn @left\nend function",
 	"is_type": "is_type = function(value, type)\n\treturn typeof(value) == type\nend function",
 	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return when_true\n\treturn when_false\nend function",
-	...extensionFunctions
 };
 
 export function createAnonFunction(body: string, params: string[]) {

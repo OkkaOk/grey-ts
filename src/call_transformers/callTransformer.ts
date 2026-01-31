@@ -1,6 +1,6 @@
 import path from "node:path";
 import ts from "typescript";
-import { transpileSourceFile, utilFunctions, utilitiesToInsert, type TranspileContext } from "../transpiler";
+import { extensionFunctions, transpileSourceFile, utilitiesToInsert, type TranspileContext } from "../transpiler";
 import { callUtilFunction, getSourceFiles } from "../utils";
 
 type CallHandlerType = (functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext) => string;
@@ -16,11 +16,11 @@ export class CallTransformer {
 	}
 
 	static handle(symbolFullName: string, functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext): string | null {
-		if (symbolFullName in utilFunctions) {
+		if (symbolFullName in extensionFunctions) {
 			if (symbolFullName.startsWith("Math"))
 				utilitiesToInsert.set("create_math", "Math = {}");
 			
-			utilitiesToInsert.set(symbolFullName, utilFunctions[symbolFullName as keyof typeof utilFunctions]);
+			utilitiesToInsert.set(symbolFullName, extensionFunctions[symbolFullName as keyof typeof extensionFunctions]);
 
 			const params = callArgs.length ? `(${callArgs.join(",")})` : "";
 			return `${functionName}${params}`;
