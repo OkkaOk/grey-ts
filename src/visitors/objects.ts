@@ -67,8 +67,12 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 	outObjects ??= [];
 	funcs ??= [];
 
-	const objectName = ts.hasOnlyExpressionInitializer(node.parent) ? NodeHandler.handle(node.parent.name) :
-		ts.isBinaryExpression(node.parent) && node === node.parent.right ? NodeHandler.handle(node.parent.left) : "";
+	let objectName = ""
+
+	if (ts.hasOnlyExpressionInitializer(node.parent))
+		objectName = NodeHandler.handle(node.parent.name)
+	else if (ts.isBinaryExpression(node.parent) && node === node.parent.right)
+		objectName = NodeHandler.handle(node.parent.left);
 
 	function pushObj() {
 		if (!currObj?.length)
@@ -85,17 +89,12 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 
 	for (const item of node.properties) {
 		if (ts.isFunctionLike(item)) {
-			if (!objectName)
-				throw "You can't have method declarations inside an object that is not being assigned to a variable";
-
-			funcs.push(`${objectName}.${NodeHandler.handle(item)}`);
+			funcs.push(NodeHandler.handle(item));
 			continue;
 		}
 
 		if (ts.isPropertyAssignment(item) && ts.isFunctionLike(item.initializer)) {
-			if (!objectName)
-				throw "You can't have method declarations inside an object that is not being assigned to a variable";
-			funcs.push(`${objectName}.${NodeHandler.handle(item.name)} = ${NodeHandler.handle(item.initializer)}`);
+			funcs.push(`${NodeHandler.handle(item.name)} = ${NodeHandler.handle(item.initializer)}`);
 			continue;
 		}
 
@@ -132,7 +131,11 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 	}
 
 	if (funcs.length) {
-		output += "\n" + funcs.join("\n");
+		if (ts.isPropertyAssignment(node.parent) || !objectName) {
+			throw "You can't have method declarations inside an object that is not being assigned to a variable";
+		}
+
+		output += "\n" + funcs.map(func => `${objectName}.${func}`).join("\n");
 	}
 
 	return output;
