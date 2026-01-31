@@ -127,7 +127,7 @@ export const extensionFunctions = {
 	"Array.includes": [
 		"list.includes = function(value, pos = 0)",
 		"	index = self.indexOf(value)",
-		"	if index == null then return false",
+		"	if index == null then return 0",
 		"	if pos < 0 then pos = 0",
 		"	return index >= pos",
 		"end function",
@@ -168,7 +168,7 @@ export const extensionFunctions = {
 	"String.includes": [
 		"string.includes = function(search, pos = 0)",
 		"	index = self.indexOf(search)",
-		"	if index == null then return false",
+		"	if index == null then return 0",
 		"	if pos < 0 then pos = 0",
 		"	return index >= pos",
 		"end function",
@@ -288,6 +288,17 @@ export const utilFunctions = {
 		"	if source3 then assign_object(target, source3)",
 		"	return target",
 		"end function"
+	].join("\n"),
+	"instance_of": [
+		"instance_of = function(obj, class)",
+		'	if not obj.hasIndex("__isa") then return 0',
+		'	isaobj = obj',
+		'	while isaobj.hasIndex("__isa")',
+		'		if isaobj["__isa"] == class then return 1',
+		'		isaobj = isaobj["__isa"]',
+		'	end while',
+		'	return 0',
+		"end function",
 	].join("\n"),
 	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif left == null then return @right\n\treturn @left\nend function",
 	"or_op": "or_op = function(left, right)\n\tif not left then return @right\n\treturn @left\nend function",

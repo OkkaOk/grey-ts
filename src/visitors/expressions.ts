@@ -250,22 +250,9 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 		return callUtilFunction("or_op", left, right);
 	}
 
-	if (operatorToken === "instanceof") {
-		const rightSymbol = checker.getSymbolAtLocation(node.right);
-		const classIdMember = rightSymbol?.members?.get(ts.escapeLeadingUnderscores("classID"));
-		if (!classIdMember) {
-			throw `Can't handle this 'instanceof' operator because '${right}' doesn't have a 'classID' member, which is needed in GreyScript to check a type`;
-		}
-
-		const declaration = classIdMember.valueDeclaration as ts.PropertyDeclaration | undefined;
-		if (!declaration || !("initializer" in declaration) || !declaration.initializer) {
-			throw `The 'classID' property of '${right}' isn't initialized`;
-		}
-
-		return `${left}.classID == typeof(${right})`;
-	}
-
 	switch (operatorToken) {
+		case "instanceof":
+			return callUtilFunction("instance_of", left, right);
 		case "??":
 			return callUtilFunction("nullish_coalescing_op", left, right);
 		case "??=":
