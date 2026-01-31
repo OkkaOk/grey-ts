@@ -3,6 +3,42 @@ import { NodeHandler } from "../nodeHandler";
 import { checker, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess, valueIsBeingAssignedToNode } from "../utils";
 
+function shouldGetSafely(node: ts.PropertyAccessExpression | ts.ElementAccessExpression) {
+	if (ts.isNonNullExpression(node.parent))
+		return false;
+
+	if (valueIsBeingAssignedToNode(node))
+		return false;
+
+	const hasQuestionDot = !!node.questionDotToken;
+
+	if (ts.isPropertyAccessExpression(node)) {
+		const rightType = checker.getTypeAtLocation(node.name);
+		if (!rightType.isUnion()) return hasQuestionDot;
+
+		// Check if the right side has an undefined type.
+		// If not, return false even if there was a questionDot token.
+		const hasUndefined = rightType.types.some(t => t.flags === ts.TypeFlags.Undefined);
+		if (!hasUndefined) return false;
+
+		if (!ts.isCallExpression(node.parent)) return true;
+
+		// The get_property loses the 'self' inside the fetched function.
+		// For example file?.move("somePath") would turn into get_property(file, "move")("somePath")
+		// Here, the get_property returns the move function, but it doesn't know about the file it was in, so the function is useless.
+		// But those functions that take no parameters, have a detached version where we can insert the 'self' parameter, which get_property does (like file?.path())
+		if (node.parent.arguments.length)
+			return false;
+	}
+	else {
+		if (ts.isNumericLiteral(node.argumentExpression))
+			return false;
+	}
+
+
+	return hasQuestionDot;
+}
+
 NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyAccessExpression, ctx) => {
 	const left = NodeHandler.handle(node.expression);
 
@@ -17,22 +53,8 @@ NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyA
 	if (ctx.namespaceImports[ctx.currentFilePath]?.has(left))
 		return right;
 
-	let getSafely = !!node.questionDotToken && !ts.isNonNullExpression(node.parent);
-
-	const rightType = checker.getTypeAtLocation(node.name);
-	if (rightType.isUnion()) {
-		// TODO: situation if right side is a function call.
-
-		const hasUndefined = rightType.types.some(t => t.flags === ts.TypeFlags.Undefined);
-		if (hasUndefined) getSafely = true;
-	}
-
-	if (!valueIsBeingAssignedToNode(node) && getSafely)
+	if (shouldGetSafely(node))
 		return callUtilFunction("get_property", left, `"${right}"`);
-
-	// console.log(node.name.text, checker.getTypeAtLocation(node.name))
-
-	// console.log(checker.typeToString(leftType), symbol ? checker.getFullyQualifiedName(symbol) : "")
 
 	let output = `${left}.${right}`;
 	output = replacePropertyAccess(output, nodeSymbol);
@@ -55,7 +77,7 @@ NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAcc
 		right = NodeHandler.handle(node.argumentExpression);
 	}
 
-	if (!valueIsBeingAssignedToNode(node) && !ts.isNumericLiteral(node.argumentExpression)) {
+	if (shouldGetSafely(node)) {
 		return callUtilFunction("get_property", left, `${right}`);
 	}
 
@@ -67,10 +89,10 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 	outObjects ??= [];
 	funcs ??= [];
 
-	let objectName = ""
+	let objectName = "";
 
 	if (ts.hasOnlyExpressionInitializer(node.parent))
-		objectName = NodeHandler.handle(node.parent.name)
+		objectName = NodeHandler.handle(node.parent.name);
 	else if (ts.isBinaryExpression(node.parent) && node === node.parent.right)
 		objectName = NodeHandler.handle(node.parent.left);
 
