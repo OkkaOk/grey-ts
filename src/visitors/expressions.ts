@@ -3,8 +3,7 @@ import ts from "typescript";
 import { CallTransformer } from "../call_transformers/callTransformer";
 import { NodeHandler } from "../nodeHandler";
 import { checker, utilFunctions, utilitiesToInsert, type TranspileContext } from "../transpiler";
-import { asRef, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
-import { assignmentOperators } from "./objects";
+import { asRef, assignmentOperators, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
 /** Check if the last parameter is a rest parameter */
 function hasRestParam(params: readonly ts.Symbol[]): boolean {
@@ -290,30 +289,28 @@ function handleUnaryExpression(node: ts.PrefixUnaryExpression | ts.PostfixUnaryE
 	const operand = NodeHandler.handle(node.operand);
 
 	const operator = ts.tokenToString(node.operator);
-	if (operator === "++")
-		return `${operand} = ${operand} + 1`;
 
-	if (operator === "--")
-		return `${operand} = ${operand} - 1`;
+	switch (operator) {
+		case "++":
+		case "--":
+			if (ts.hasOnlyExpressionInitializer(node.parent) || ts.isBinaryExpression(node.parent))
+				throw `Operator ${operator} is not supported for this kind of expression yet`;
+			return `${operand} = ${operand} ${operator[0]} 1`;
+		case "!":
+			if (ts.isPrefixUnaryExpression(node.parent) && ts.tokenToString(node.parent.operator) === "!") {
+				return `(not ${operand})`;
+			}
 
-	if (operator === "!") {
-		if (ts.isPrefixUnaryExpression(node.parent) && ts.tokenToString(node.parent.operator) === "!") {
-			return `(not ${operand})`;
-		}
-
-		return `not ${operand}`;
+			return `not ${operand}`;
+		case "-":
+			return `-${operand}`;
+		case "+":
+			return `str(${operand}).val`;
+		case "~":
+			return `bitwise("~", ${operand})`;
+		default:
+			throw `Couldn't handle this UnaryExpression: ${node.getText()}`;
 	}
-
-	if (operator === "-")
-		return `-${operand}`;
-
-	if (operator === "+")
-		return `str(${operand}).val()`;
-
-	if (operator === "~")
-		return `bitwise("~", ${operand})`;
-
-	throw `Couldn't handle this UnaryExpression: ${node.getText()}`;
 }
 
 NodeHandler.register(ts.SyntaxKind.PrefixUnaryExpression, handleUnaryExpression);

@@ -1,26 +1,7 @@
 import ts from "typescript";
 import { NodeHandler } from "../nodeHandler";
 import { checker, type TranspileContext } from "../transpiler";
-import { asRef, callUtilFunction, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess } from "../utils";
-
-export const assignmentOperators = new Set<string>([
-	"=", "??=", "||=", "-=", "+="
-]);
-
-function valueIsBeingAssignedToNode(node: ts.Node): boolean {
-	const assignAncestor = ts.findAncestor(node, ancestor => {
-		if (ancestor.parent && ts.isBinaryExpression(ancestor.parent) && ancestor === ancestor.parent.left) {
-			const token = ts.tokenToString(ancestor.parent.operatorToken.kind) || ancestor.parent.operatorToken.getText();
-			return assignmentOperators.has(token);
-		}
-
-		return false;
-	});
-	// if (ts.isVariableDeclaration(node.parent) && node === node.parent.name)
-	// 	return true;
-
-	return !!assignAncestor;
-}
+import { asRef, callUtilFunction, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess, valueIsBeingAssignedToNode } from "../utils";
 
 NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyAccessExpression, ctx) => {
 	const left = NodeHandler.handle(node.expression);

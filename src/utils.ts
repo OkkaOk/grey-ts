@@ -177,3 +177,23 @@ export function printNodeAST(node: ts.Node, output: string[] = [], depth = 0, is
 
 	if (isRoot) console.log(output.join("\n"));
 }
+
+export const assignmentOperators = new Set<string>([
+	"=", "??=", "||=", "-=", "+="
+]);
+
+export function valueIsBeingAssignedToNode(node: ts.Node): boolean {
+	if (ts.hasOnlyExpressionInitializer(node.parent) && node === node.parent.name)
+		return true;
+
+	const assignAncestor = ts.findAncestor(node, ancestor => {
+		if (ancestor.parent && ts.isBinaryExpression(ancestor.parent) && ancestor === ancestor.parent.left) {
+			const token = ts.tokenToString(ancestor.parent.operatorToken.kind) || ancestor.parent.operatorToken.getText();
+			return assignmentOperators.has(token);
+		}
+
+		return false;
+	});
+
+	return !!assignAncestor;
+}
