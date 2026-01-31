@@ -247,7 +247,7 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 
 	switch (operatorToken) {
 		case "instanceof":
-			return callUtilFunction("instance_of", left, right);
+			return `${left} isa ${right}`;
 		case "??":
 			return callUtilFunction("nullish_coalescing_op", left, right);
 		case "??=":

@@ -306,17 +306,6 @@ export const utilFunctions = {
 		"	return target",
 		"end function"
 	].join("\n"),
-	"instance_of": [
-		"instance_of = function(obj, class)",
-		'	if not obj.hasIndex("__isa") then return 0',
-		'	isaobj = obj',
-		'	while isaobj.hasIndex("__isa")',
-		'		if isaobj["__isa"] == class then return 1',
-		'		isaobj = isaobj["__isa"]',
-		'	end while',
-		'	return 0',
-		"end function",
-	].join("\n"),
 	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif left == null then return @right\n\treturn @left\nend function",
 	"or_op": "or_op = function(left, right)\n\tif not left then return @right\n\treturn @left\nend function",
 	"is_type": "is_type = function(value, type)\n\treturn typeof(value) == type\nend function",
