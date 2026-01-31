@@ -34,12 +34,11 @@
 		"build": "bun run scripts/build.ts"
 	},
 	"devDependencies": {
-		"@types/bun": "latest"
+		"@types/bun": "latest",
+		"@grey-ts/types": "latest"
 	},
 	"peerDependencies": {
-		"typescript": "^5"
-	},
-	"dependencies": {
+		"typescript": "^5",
 		"@grey-ts/types": "^2.2.0"
 	}
 }
