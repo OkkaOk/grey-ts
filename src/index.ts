@@ -29,10 +29,21 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 
 const root = findProjectRoot(process.cwd());
+const outDirPath = `${root}/out`;
 
 if (!command) {
 	console.error("No command specified.");
 	process.exit(2);
+}
+
+function createOutputFile(fileIndex: number, basename: string, content: string) {
+	if (fileIndex > 0)
+		basename = `${basename}-${fileIndex}`;
+
+	const outFileName = args.length > 1 ? args[1]! : `${basename}.src`;
+	const outFilePath = path.join(outDirPath, outFileName);
+
+	fs.writeFileSync(outFilePath, content);
 }
 
 if (command === "transpile") {
@@ -42,23 +53,43 @@ if (command === "transpile") {
 	}
 
 	const entryFile = args[0]!;
-	const output = transpileProgram(entryFile);
+	const basename = path.basename(entryFile, ".ts");
+
+	const transpiledStatements = transpileProgram(entryFile);
 
 	if (flags.includes("--print") || flags.includes("-p")) {
-		console.log(output);
+		console.log(transpiledStatements.join("\n"));
 		process.exit(0);
 	}
-
-	const outDirPath = `${root}/out`;
+	
 	if (!fs.existsSync(outDirPath))
 		fs.mkdirSync(outDirPath);
 
-	const outFileName = args.length > 1 ? args[1]! : `${path.basename(entryFile).replace(".ts", ".src")}`;
+	let content = "";
+	const fileContents: string[] = [];
 
-	// TODO: split to multiple if over 160k characters. Or let greybel handle it?
-	const outFilePath = path.join(outDirPath, outFileName);
+	while (transpiledStatements.length) {
+		const statement = transpiledStatements.shift()!;
+		if (content.length + statement.length > 155_000 && content.length) {
+			fileContents.push(content);
+			content = "";
+			continue;
+		}
 
-	fs.writeFileSync(outFilePath, output);
+		content += statement + "\n";
+	}
+
+	if (content.length)
+		fileContents.push(content);
+
+	for (let i = 0; i < fileContents.length; i++) {
+		if (i + 1 < fileContents.length) {
+			const nextFileName = `${basename}-${i+1}.src`
+			fileContents[i] += `import_code("${nextFileName}")`;
+		}
+
+		createOutputFile(i, basename, fileContents[i]!);
+	}
 }
 else {
 	console.log(`Invalid command: ${command}`);

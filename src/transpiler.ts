@@ -291,7 +291,7 @@ export const utilFunctions = {
 	].join("\n"),
 	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif left == null then return @right\n\treturn @left\nend function",
 	"or_op": "or_op = function(left, right)\n\tif not left then return @right\n\treturn @left\nend function",
-	"is_type": "is_type = function(value, type)\n\tif typeof(value) == type then return 1\n\treturn 0\nend function",
+	"is_type": "is_type = function(value, type)\n\treturn typeof(value) == type\nend function",
 	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return when_true\n\treturn when_false\nend function",
 	...extensionFunctions
 };
@@ -348,7 +348,7 @@ export function transpileString(typescriptString: string) {
 	return ctx.output.join("\n");
 }
 
-export function transpileProgram(entryFileRelativePath: string) {
+export function transpileProgram(entryFileRelativePath: string): string[] {
 	const ctx: TranspileContext = {
 		currentFolder: "",
 		currentFilePath: path.resolve(process.cwd(), entryFileRelativePath),
@@ -422,7 +422,7 @@ export function transpileProgram(entryFileRelativePath: string) {
 
 	console.log(`Transpiling took ${Date.now() - start} ms`);
 
-	return ctx.output.join("\n");
+	return ctx.output;
 }
 
 export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext, returnResult?: boolean) {
