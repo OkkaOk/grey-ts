@@ -96,7 +96,6 @@ export const apiNameMap: Record<string, string> = {
 	"GreyHack.programPath": "program_path",
 	"GreyHack.resetCtfPassword": "reset_ctf_password",
 	"GreyHack.getType": "typeof",
-	"GreyHack.isType": "is_type",
 	"GreyHack.userBankNumber": "user_bank_number",
 	"GreyHack.userInput": "user_input",
 	"GreyHack.userMailAddress": "user_mail_address",

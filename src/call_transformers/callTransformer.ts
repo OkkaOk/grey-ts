@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
 import { transpileSourceFile, utilFunctions, utilitiesToInsert, type TranspileContext } from "../transpiler";
-import { getSourceFiles } from "../utils";
+import { callUtilFunction, getSourceFiles } from "../utils";
 
 type CallHandlerType = (functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext) => string;
 
@@ -58,6 +58,10 @@ CallTransformer.register("GreyHack.include", (name, args, node, ctx) => {
 	}
 
 	return "";
+});
+
+CallTransformer.register("GreyHack.isType", (name, args) => {
+	return callUtilFunction("is_type", args.join(","));
 });
 
 CallTransformer.register("Boolean", (name, args) => {
