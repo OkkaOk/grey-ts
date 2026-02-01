@@ -12,10 +12,10 @@ function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray
 NodeHandler.register(ts.SyntaxKind.Block, (node: ts.Block) => {
 	const output = node.statements.map(val => {
 		let statement = NodeHandler.handle(val);
-		statement = statement.split("\n").map(line => "\t" + line).join("\n");
+		statement = statement.split("\n").filter(s => !!s).map(line => "\t" + line).join("\n");
 
 		return statement;
-	}).join("\n");
+	}).filter(s => !!s).join("\n");
 
 	return output;
 });

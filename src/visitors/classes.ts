@@ -20,6 +20,9 @@ NodeHandler.register(ts.SyntaxKind.ClassDeclaration, (node: ts.ClassDeclaration)
 		if (ts.isFunctionLike(member) && ("body" in member) && !member.body)
 			continue;
 
+		if (ts.isSemicolonClassElement(member))
+			continue;
+
 		if (member.name) {
 			const memberName = NodeHandler.handle(member.name);
 			if (declaredNames.has(memberName))
