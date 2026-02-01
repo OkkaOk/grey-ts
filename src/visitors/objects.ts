@@ -10,11 +10,9 @@ function shouldGetSafely(node: ts.PropertyAccessExpression | ts.ElementAccessExp
 	if (valueIsBeingAssignedToNode(node))
 		return false;
 
-	const hasQuestionDot = !!node.questionDotToken;
-
 	if (ts.isPropertyAccessExpression(node)) {
 		const rightType = checker.getTypeAtLocation(node.name);
-		if (!rightType.isUnion()) return hasQuestionDot;
+		if (!rightType.isUnion()) return !!node.questionDotToken;
 
 		// Check if the right side has an undefined type.
 		// If not, return false even if there was a questionDot token.
@@ -31,12 +29,11 @@ function shouldGetSafely(node: ts.PropertyAccessExpression | ts.ElementAccessExp
 			return false;
 	}
 	else {
-		if (ts.isNumericLiteral(node.argumentExpression))
+		if (ts.isNumericLiteral(node.argumentExpression) && !node.questionDotToken)
 			return false;
 	}
 
-
-	return hasQuestionDot;
+	return true;
 }
 
 NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyAccessExpression, ctx) => {
