@@ -1,19 +1,19 @@
 import path from "node:path";
 import ts from "typescript";
 import { NodeHandler } from "../nodeHandler";
-import { program, transpileSourceFile, type TranspileContext } from "../transpiler";
+import { program, type TranspileContext } from "../transpiler";
 
-function importFile(filePath: string, ctx: TranspileContext, returnResult?: boolean): string {
+function importFile(filePath: string, ctx: TranspileContext): string {
 	let srcPath = path.resolve(ctx.currentFolder, filePath);
 	if (!path.extname(srcPath)) srcPath += ".ts";
-	
-	const source = program.getSourceFile(srcPath)
+
+	const source = program.getSourceFile(srcPath);
 	if (!source) {
 		console.error(`Failed to find source ${srcPath}`);
-		return ""
+		return "";
 	}
 
-	return transpileSourceFile(source, ctx, returnResult);
+	return NodeHandler.handle(source);
 }
 
 // importClause - In case of:
@@ -24,20 +24,10 @@ function importFile(filePath: string, ctx: TranspileContext, returnResult?: bool
 // import d, { a, b as x } from "mod" => name = d, namedBinding: NamedImports = { elements: [{ name: a }, { name: x, propertyName: b}]}
 NodeHandler.register(ts.SyntaxKind.ImportDeclaration, (node: ts.ImportDeclaration, ctx) => {
 	// e.g. import "mod"
-	// In normal TypeScript/JavaScript, the module would just be executed so we need to emulate that
+	// Not how it works in normal ts/js but its fine for now.
 	if (!node.importClause) {
 		const moduleName = (node.moduleSpecifier as ts.StringLiteral).text;
-		const transpiledFile = importFile(moduleName, ctx, true);
-		if (!transpiledFile)
-			return "";
-
-		const rndName = "func_" + (Date.now() * Math.random()).toString().slice(0, 6);
-		return [
-			`${rndName} = function`,
-			transpiledFile.split("\n").map(line => "\t" + line).join("\n"),
-			"end function",
-			`${rndName}()`
-		].join("\n");
+		return importFile(moduleName, ctx);
 	}
 
 	// Types only
@@ -59,7 +49,7 @@ NodeHandler.register(ts.SyntaxKind.ImportDeclaration, (node: ts.ImportDeclaratio
 				if (!el.propertyName || el.isTypeOnly) return;
 
 				ctx.namedImports[ctx.currentFilePath]![el.name.text] = el.propertyName.text;
-			})
+			});
 		}
 	}
 

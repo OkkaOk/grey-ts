@@ -29,8 +29,9 @@ export type TranspileContext = {
 	namedImports: Record<string, Record<string, string>>;
 	basePath?: string;
 	mode?: Mode;
-	visitedFiles: Record<string, boolean>;
+	visitedFiles: Set<string>;
 	output: string[];
+	extraOutput: Map<ts.Node, { before: string, after: string; }>;
 };
 
 export let program: ts.Program;
@@ -312,14 +313,17 @@ export const utilFunctions = {
 	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return when_true\n\treturn when_false\nend function",
 };
 
-export function createAnonFunction(body: string, params: string[]) {
+let anonFunctionsCreated = 0;
+export function createAnonFunction(body: string, params: string[], insertToUtils = true) {
 	const defaultParams = new Array(3).fill(0).map((_, i) => `param${i}`);
 
-	const nextName = `func_${utilitiesToInsert.size}`; // A unique name
+	const nextName = `func_${anonFunctionsCreated}`; // A unique name
 	const paramString = Object.assign(defaultParams, params).join(",");
 
 	const result = `${nextName} = function(${paramString})\n${body}\nend function`;
-	utilitiesToInsert.set(nextName, result);
+
+	anonFunctionsCreated++;
+	if (insertToUtils) utilitiesToInsert.set(nextName, result);
 
 	return { name: nextName, str: result };
 }
@@ -328,16 +332,20 @@ export function createAnonFunction(body: string, params: string[]) {
 // 	entryFileRelativePath: string,
 // }
 
-export function transpileString(typescriptString: string) {
-	const ctx: TranspileContext = {
+function createContext(currentFileName = "file.ts"): TranspileContext {
+	return {
 		currentFolder: process.cwd(),
-		currentFilePath: path.resolve(process.cwd(), "file.ts"),
+		currentFilePath: path.resolve(process.cwd(), currentFileName),
 		namedImports: {},
 		namespaceImports: {},
-		visitedFiles: {},
+		visitedFiles: new Set(),
 		output: [],
+		extraOutput: new Map(),
 	};
+}
 
+export function transpileString(typescriptString: string) {
+	const ctx = createContext();
 	NodeHandler.transpileContext = ctx;
 
 	const sourceFile = parseCode("file.ts", typescriptString);
@@ -354,7 +362,7 @@ export function transpileString(typescriptString: string) {
 
 	checker = program.getTypeChecker();
 
-	transpileSourceFile(sourceFile, ctx);
+	NodeHandler.handle(sourceFile);
 
 	if (utilitiesToInsert.size) {
 		ctx.output.unshift(...utilitiesToInsert.values());
@@ -365,15 +373,7 @@ export function transpileString(typescriptString: string) {
 }
 
 export function transpileProgram(entryFileRelativePath: string): string[] {
-	const ctx: TranspileContext = {
-		currentFolder: "",
-		currentFilePath: path.resolve(process.cwd(), entryFileRelativePath),
-		namedImports: {},
-		namespaceImports: {},
-		visitedFiles: {},
-		output: [],
-	};
-
+	const ctx = createContext(entryFileRelativePath);
 	NodeHandler.transpileContext = ctx;
 
 	ctx.currentFolder = path.dirname(ctx.currentFilePath);
@@ -422,14 +422,8 @@ export function transpileProgram(entryFileRelativePath: string): string[] {
 		process.exit(1);
 	}
 
-	// Todo: Maybe use worker threads if it takes too long to transpile
-	transpileSourceFile(entry, ctx);
-
-	// const output: string[] = [];
-	// for (const source of sources) {
-	// 	const result = transpileSourceFile(source, ctx);
-	// 	output.push(result);
-	// }
+	// TODO: Maybe use worker threads if it takes too long to transpile
+	NodeHandler.handle(entry);
 
 	if (utilitiesToInsert.size) {
 		ctx.output.unshift(...utilitiesToInsert.values());
@@ -439,43 +433,4 @@ export function transpileProgram(entryFileRelativePath: string): string[] {
 	console.log(`Transpiling took ${Date.now() - start} ms`);
 
 	return ctx.output;
-}
-
-export function transpileSourceFile(sourceFile: ts.SourceFile, ctx: TranspileContext, returnResult?: boolean) {
-	if (ctx.visitedFiles[sourceFile.fileName])
-		return "";
-
-	ctx.visitedFiles[sourceFile.fileName] = true;
-
-	if (sourceFile.isDeclarationFile)
-		return "";
-
-	if (program.isSourceFileDefaultLibrary(sourceFile) || program.isSourceFileFromExternalLibrary(sourceFile))
-		return "";
-
-	const prevFile = ctx.currentFilePath;
-
-	// printNodeAST(sourceFile);
-
-	ctx.currentFilePath = sourceFile.fileName;
-	ctx.currentFolder = path.dirname(sourceFile.fileName);
-	ctx.namedImports[sourceFile.fileName] = {};
-	ctx.namespaceImports[sourceFile.fileName] = new Set();
-
-	const output: string[] = [];
-
-	sourceFile.forEachChild((node) => {
-		const result = NodeHandler.handle(node);
-		if (!result) return;
-
-		if (!returnResult)
-			ctx.output.push(result);
-		else
-			output.push(result);
-	});
-
-	ctx.currentFilePath = prevFile;
-	ctx.currentFolder = path.dirname(prevFile);
-
-	return output.join("\n");
 }

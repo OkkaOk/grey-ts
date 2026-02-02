@@ -45,7 +45,18 @@ NodeHandler.register(ts.SyntaxKind.ArrowFunction, (node: ts.ArrowFunction) => {
 	const body = ts.isBlock(node.body) ? NodeHandler.handle(node.body) : `\treturn ${NodeHandler.handle(node.body)}`;
 
 	if (ts.isCallOrNewExpression(node.parent) || ts.isParenthesizedExpression(node.parent)) {
-		return "@" + createAnonFunction(body, params).name;
+		const mainNode = ts.findAncestor(node.parent, n => n.parent && (ts.isBlock(n.parent) || ts.isSourceFile(n.parent)))
+
+		// Shouldn't ever happen because in the case where there wasn't a block ancestor, it should be sourceFile then.
+		// But if for some reason it does happen, the function gets put at the top of the output file
+		if (!mainNode) {
+			return "@" + createAnonFunction(body, params).name;
+		}
+
+		const anon = createAnonFunction(body, params, false);
+		NodeHandler.addExtraOutput(mainNode, anon.str, null);
+
+		return "@" + anon.name;
 	}
 
 	if (ts.hasOnlyExpressionInitializer(node.parent) || ts.isBinaryExpression(node.parent) || ts.isReturnStatement(node.parent)) {

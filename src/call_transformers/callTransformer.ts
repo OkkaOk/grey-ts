@@ -1,6 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
-import { extensionFunctions, transpileSourceFile, utilitiesToInsert, type TranspileContext } from "../transpiler";
+import { NodeHandler } from "../nodeHandler";
+import { extensionFunctions, utilitiesToInsert, type TranspileContext } from "../transpiler";
 import { callUtilFunction, getSourceFiles } from "../utils";
 
 type CallHandlerType = (functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext) => string;
@@ -54,7 +55,7 @@ CallTransformer.register("GreyHack.include", (name, args, node, ctx) => {
 	const sources = getSourceFiles(absPath);
 
 	for (const source of sources) {
-		transpileSourceFile(source, ctx);
+		NodeHandler.handle(source);
 	}
 
 	return "";

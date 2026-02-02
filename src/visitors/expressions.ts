@@ -139,7 +139,7 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 	const transformed = CallTransformer.handle(symbolFullName, name, args, node, ctx);
 	if (transformed !== null) return transformed;
 
-	if (!args.length)
+	if (!args.length && !ts.isParenthesizedExpression(node.expression))
 		return name;
 
 	return `${name}(${args.join(", ")})`;
@@ -182,7 +182,7 @@ function shouldHaveOuterPrefix(node: ts.BinaryExpression, operator: string): boo
 		return false;
 
 	// Symbols position is outside this function's boundary
-	return (leftSymbol.valueDeclaration.pos < functionAncestor.pos || leftSymbol.valueDeclaration.pos > functionAncestor.end);
+	return (leftSymbol.valueDeclaration.end < functionAncestor.pos || leftSymbol.valueDeclaration.pos > functionAncestor.end);
 }
 
 function isAssignmentChain(node: ts.BinaryExpression, operator: string): boolean {
