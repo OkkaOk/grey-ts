@@ -76,7 +76,7 @@ if (command === "transpile") {
 			continue;
 		}
 
-		content += statement + "\n";
+		content += `${statement}\n`;
 	}
 
 	if (content.length)

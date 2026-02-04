@@ -385,7 +385,7 @@ export function transpileProgram(entryFileRelativePath: string): string[] {
 
 	let start = Date.now();
 
-	const tsconfigPath = findProjectRoot(process.cwd(), "tsconfig.json") + "/tsconfig.json";
+	const tsconfigPath = `${findProjectRoot(process.cwd(), "tsconfig.json")}/tsconfig.json`;
 	const res = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
 	const parsed = ts.parseJsonConfigFileContent(res.config, ts.sys, path.dirname(tsconfigPath));
 	// console.log(parsed)

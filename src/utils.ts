@@ -19,17 +19,17 @@ export function getOperatorToken(node: ts.Node) {
 	if (!knownOperators.has(operatorToken))
 		throw `Can't handle operator '${operatorToken}' yet`;
 
-	if (operatorToken == "||") operatorToken = "or";
-	else if (operatorToken == "&&") operatorToken = "and";
-	else if (operatorToken == "===") operatorToken = "==";
-	else if (operatorToken == "!==") operatorToken = "!=";
+	if (operatorToken === "||") operatorToken = "or";
+	else if (operatorToken === "&&") operatorToken = "and";
+	else if (operatorToken === "===") operatorToken = "==";
+	else if (operatorToken === "!==") operatorToken = "!=";
 
 	return operatorToken;
 }
 
 export function transformString(value: string): string {
 	value = value
-		.replaceAll('"', '\"\"')
+		.replaceAll('"', '""')
 		.replaceAll("\n", ` \\n`);
 	return value;
 }
@@ -70,7 +70,7 @@ export function ancestorCount(node: ts.Node, counter: (node: ts.Node) => boolean
 
 export function asRef(value: string): string {
 	if (value[0] === "@") return value;
-	return "@" + value;
+	return `@${value}`;
 }
 
 export function unRef(value: string): string {
@@ -137,7 +137,7 @@ export function replaceIdentifier(original: string, type: ts.Type, propertyName?
 	// Without this for example this happens: "const oldUserInput = userInput" would turn into "@user_input = @user_input"
 	const dotIndex = symbolFullName.lastIndexOf(".");
 	const strToReplace = dotIndex !== null ? symbolFullName.slice(dotIndex + 1) : symbolFullName;
-	if (strToReplace != original)
+	if (strToReplace !== original)
 		return original;
 
 	return replaceValue;

@@ -10,7 +10,7 @@ NodeHandler.register(ts.SyntaxKind.ClassDeclaration, (node: ts.ClassDeclaration)
 
 	const extensions = node.heritageClauses?.filter(h => h.token === ts.SyntaxKind.ExtendsKeyword);
 	let output = `${name} = {}`;
-	if (extensions && extensions.length && extensions[0]!.types.length)
+	if (extensions?.length && extensions[0]!.types.length)
 		output = `${name} = new ${NodeHandler.handle(extensions[0]!.types[0]!.expression)}`;
 
 	const declaredNames = new Set<string>();

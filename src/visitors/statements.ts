@@ -37,7 +37,7 @@ NodeHandler.register(ts.SyntaxKind.ForStatement, (node: ts.ForStatement) => {
 		].join("\n");
 	}
 
-	const incrementedStateVarName = "state_" + (Date.now() * Math.random()).toFixed(0).slice(0, 6);
+	const incrementedStateVarName = `state_${(Date.now() * Math.random()).toFixed(0).slice(0, 6)}`;
 
 	const output = [
 		`${incrementedStateVarName} = 1`,
@@ -129,7 +129,7 @@ NodeHandler.register(ts.SyntaxKind.IfStatement, (node: ts.IfStatement) => {
 	return output;
 });
 
-NodeHandler.register(ts.SyntaxKind.WhileStatement, (node: ts.WhileStatement, ctx) => {
+NodeHandler.register(ts.SyntaxKind.WhileStatement, (node: ts.WhileStatement) => {
 	const expression = NodeHandler.handle(node.expression);
 	const labelIf = ts.isLabeledStatement(node.parent) ? `	if ${node.parent.label.text}Broke then break` : "";
 
@@ -141,7 +141,7 @@ NodeHandler.register(ts.SyntaxKind.WhileStatement, (node: ts.WhileStatement, ctx
 	].join("\n");
 });
 
-NodeHandler.register(ts.SyntaxKind.DoStatement, (node: ts.DoStatement, ctx) => {
+NodeHandler.register(ts.SyntaxKind.DoStatement, (node: ts.DoStatement) => {
 	const expression = NodeHandler.handle(node.expression);
 	const labelIf = ts.isLabeledStatement(node.parent) ? `	if ${node.parent.label.text}Broke then break` : "";
 
@@ -155,7 +155,8 @@ NodeHandler.register(ts.SyntaxKind.DoStatement, (node: ts.DoStatement, ctx) => {
 	].join("\n");
 });
 
-NodeHandler.register(ts.SyntaxKind.ContinueStatement, (node: ts.ContinueStatement) => {
+NodeHandler.register(ts.SyntaxKind.ContinueStatement, (_node: ts.ContinueStatement) => {
+	// TODO: handle label
 	return "continue";
 });
 

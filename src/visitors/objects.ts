@@ -62,7 +62,7 @@ NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyA
 	return output;
 });
 
-NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAccessExpression, ctx) => {
+NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAccessExpression) => {
 	const left = NodeHandler.handle(node.expression);
 	let right: string;
 
@@ -97,7 +97,7 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 		if (!currObj?.length)
 			return "";
 
-		const res = currObj.filter(s => s != "").join(",");
+		const res = currObj.filter(s => s !== "").join(",");
 		if (res) {
 			outObjects?.push(`{ ${res} }`);
 		}
@@ -154,7 +154,7 @@ function handleObjectLiteralExpression(node: ts.ObjectLiteralExpression, ctx: Tr
 			throw "You can't have method declarations inside an object that is not being assigned to a variable";
 		}
 
-		output += "\n" + funcs.map(func => `${objectName}.${func}`).join("\n");
+		output += `\n${funcs.map(func => `${objectName}.${func}`).join("\n")}`;
 	}
 
 	return output;

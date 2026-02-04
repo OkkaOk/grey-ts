@@ -1,11 +1,10 @@
 import ts from "typescript";
 import { NodeHandler } from "../nodeHandler";
-import { checker, type TranspileContext } from "../transpiler";
+import { checker } from "../transpiler";
 import { asRef, nodeIsFunctionReference } from "../utils";
 
 function handleVariableDeclaration(
 	node: ts.VariableDeclaration | ts.PropertyDeclaration,
-	ctx: TranspileContext
 ): string {
 	const left = NodeHandler.handle(node.name);
 	const initializerType = node.initializer ? checker.getTypeAtLocation(node.initializer) : undefined;
@@ -20,7 +19,7 @@ function handleVariableDeclaration(
 	}
 
 	let right = node.initializer ? (NodeHandler.handle(node.initializer) || "null") : "null";
-	if (right != "null" && nodeIsFunctionReference(node.initializer!, initializerType)) {
+	if (right !== "null" && nodeIsFunctionReference(node.initializer!, initializerType)) {
 		right = asRef(right);
 	}
 
@@ -28,11 +27,11 @@ function handleVariableDeclaration(
 	return `${left} = ${right}`;
 }
 
-NodeHandler.register(ts.SyntaxKind.VariableDeclarationList, (node: ts.VariableDeclarationList, ctx) => {
-	return node.declarations.map(decl => handleVariableDeclaration(decl, ctx)).join("\n");
+NodeHandler.register(ts.SyntaxKind.VariableDeclarationList, (node: ts.VariableDeclarationList) => {
+	return node.declarations.map(decl => handleVariableDeclaration(decl)).join("\n");
 });
 
-NodeHandler.register(ts.SyntaxKind.VariableStatement, (node: ts.VariableStatement, ctx) => {
+NodeHandler.register(ts.SyntaxKind.VariableStatement, (node: ts.VariableStatement) => {
 	if (node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword))
 		return "";
 
@@ -48,7 +47,7 @@ NodeHandler.register<ts.EnumDeclaration>(ts.SyntaxKind.EnumDeclaration, (node) =
 	function addMember(name: string, initializer: string) {
 		members.push(`${name}: ${initializer}`);
 
-		if (isNaN(+initializer))
+		if (Number.isNaN(+initializer))
 			return;
 
 		members.push(`${initializer}: ${name}`);

@@ -12,7 +12,7 @@ function transpileFunctionBody(node: { body?: ts.Block, parameters: ts.NodeArray
 NodeHandler.register(ts.SyntaxKind.Block, (node: ts.Block) => {
 	const output = node.statements.map(val => {
 		let statement = NodeHandler.handle(val);
-		statement = statement.split("\n").filter(s => !!s).map(line => "\t" + line).join("\n");
+		statement = statement.split("\n").filter(s => !!s).map(line => `\t${line}`).join("\n");
 
 		return statement;
 	}).filter(s => !!s).join("\n");
@@ -50,13 +50,13 @@ NodeHandler.register(ts.SyntaxKind.ArrowFunction, (node: ts.ArrowFunction) => {
 		// Shouldn't ever happen because in the case where there wasn't a block ancestor, it should be sourceFile then.
 		// But if for some reason it does happen, the function gets put at the top of the output file
 		if (!mainNode) {
-			return "@" + createAnonFunction(body, params).name;
+			return `@${createAnonFunction(body, params).name}`;
 		}
 
 		const anon = createAnonFunction(body, params, false);
 		NodeHandler.addExtraOutput(mainNode, anon.str, null);
 
-		return "@" + anon.name;
+		return `@${anon.name}`;
 	}
 
 	if (ts.hasOnlyExpressionInitializer(node.parent) || ts.isBinaryExpression(node.parent) || ts.isReturnStatement(node.parent)) {

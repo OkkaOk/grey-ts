@@ -15,7 +15,7 @@ NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
 		const original = node.text;
 		for (const t of type.types) {
 			name = replaceIdentifier(node.text, t);
-			if (name != original) break;
+			if (name !== original) break;
 		}
 	}
 	else {
@@ -26,7 +26,7 @@ NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
 		name = ctx.namedImports[ctx.currentFilePath]![name]!;
 	}
 
-	if (ts.isCallOrNewExpression(node.parent) && node != node.parent.expression) {
+	if (ts.isCallOrNewExpression(node.parent) && node !== node.parent.expression) {
 		// Is inside a call expression and is a function reference
 		if (nodeIsFunctionReference(node, type))
 			name = asRef(name);

@@ -34,8 +34,9 @@
 		"build": "bun test --only-failures && bun run scripts/build.ts"
 	},
 	"devDependencies": {
-		"@types/bun": "latest",
-		"@grey-ts/types": "latest"
+		"@biomejs/biome": "2.3.14",
+		"@grey-ts/types": "latest",
+		"@types/bun": "latest"
 	},
 	"peerDependencies": {
 		"typescript": "^5",

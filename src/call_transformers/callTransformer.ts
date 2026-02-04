@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
 import { NodeHandler } from "../nodeHandler";
-import { extensionFunctions, utilitiesToInsert, type TranspileContext } from "../transpiler";
+import { extensionFunctions, type TranspileContext, utilitiesToInsert } from "../transpiler";
 import { callUtilFunction, getSourceFiles } from "../utils";
 
 type CallHandlerType = (functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext) => string;
@@ -44,7 +44,7 @@ CallTransformer.register("Function.toString", (name) => {
 	return `str(@${func})`;
 });
 
-CallTransformer.register("GreyHack.include", (name, args, node, ctx) => {
+CallTransformer.register("GreyHack.include", (_name, _args, node, ctx) => {
 	if (!node.arguments.length) return "";
 
 	const fileArg = node.arguments[0]!;
@@ -61,21 +61,21 @@ CallTransformer.register("GreyHack.include", (name, args, node, ctx) => {
 	return "";
 });
 
-CallTransformer.register("GreyHack.isType", (name, args) => {
+CallTransformer.register("GreyHack.isType", (_name, args) => {
 	return callUtilFunction("is_type", args.join(","));
 });
 
-CallTransformer.register("Boolean", (name, args) => {
+CallTransformer.register("Boolean", (_name, args) => {
 	if (!args.length) return "0";
 	return `(not (not ${args[0]}))`;
 });
 
-CallTransformer.register("Number", (name, args) => {
+CallTransformer.register("Number", (_name, args) => {
 	if (!args.length) return "0";
 	return `str(${args[0]}).val`;
 });
 
-CallTransformer.register("String", (name, args) => {
+CallTransformer.register("String", (_name, args) => {
 	if (!args.length) return "";
 	return `str(${args[0]})`;
 });

@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: <> */
 import * as path from "node:path";
 import ts from "typescript";
 import { program, type TranspileContext } from "./transpiler";
@@ -43,10 +44,12 @@ export class NodeHandler {
 	}
 
 	static addExtraOutput(node: ts.Node, before: string | null, after: string | null) {
-		if (!this.transpileContext.extraOutput.has(node))
-			this.transpileContext.extraOutput.set(node, { before: "", after: "" });
+		let extra = this.transpileContext.extraOutput.get(node);
+		if (!extra) {
+			extra = { before: "", after: "" };
+			this.transpileContext.extraOutput.set(node, extra);
+		}
 
-		const extra = this.transpileContext.extraOutput.get(node)!;
 		if (before) extra.before += before;
 		if (after) extra.after += after;
 	}

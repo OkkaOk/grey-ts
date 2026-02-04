@@ -124,7 +124,7 @@ function handleCallArgs(callNode: ts.CallExpression | ts.NewExpression, ctx: Tra
 NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx) => {
 	const args = handleCallArgs(node, ctx);
 
-	let name = NodeHandler.handle(node.expression);
+	const name = NodeHandler.handle(node.expression);
 
 	const type = checker.getTypeAtLocation(node.expression);
 	let symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
@@ -236,7 +236,7 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 	let left = NodeHandler.handle(node.left);
 
 	if (shouldHaveOuterPrefix(node, operatorToken))
-		left = "outer." + left;
+		left = `outer.${left}`;
 
 	if (nodeIsFunctionReference(node.left))
 		left = asRef(left);

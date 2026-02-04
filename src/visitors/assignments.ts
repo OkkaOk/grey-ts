@@ -10,12 +10,12 @@ NodeHandler.register(ts.SyntaxKind.PropertyAssignment, (node: ts.PropertyAssignm
 	if (ts.isNumericLiteral(node.name) || ts.isStringLiteral(node.name) || ts.isComputedPropertyName(node.name))
 		return `${NodeHandler.handle(node.name)}: ${right}`;
 
-	return `\"${NodeHandler.handle(node.name)}\": ${right}`;
+	return `"${NodeHandler.handle(node.name)}": ${right}`;
 });
 
 NodeHandler.register(ts.SyntaxKind.ShorthandPropertyAssignment, (node: ts.ShorthandPropertyAssignment) => {
 	const name = NodeHandler.handle(node.name);
-	return `\"${name}\": ${nodeIsFunctionReference(node.name) ? asRef(name) : name}`;
+	return `"${name}": ${nodeIsFunctionReference(node.name) ? asRef(name) : name}`;
 });
 
 NodeHandler.register(ts.SyntaxKind.ComputedPropertyName, (node: ts.ComputedPropertyName) => {
