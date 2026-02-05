@@ -74,7 +74,6 @@ export const apiNameMap: Record<string, string> = {
 	"GreyHack.File.setOwner": "set_owner",
 	// General
 	"GreyHack.activeUser": "active_user",
-	"GreyHack.clearScreen": "clear_screen",
 	"GreyHack.commandInfo": "command_info",
 	"GreyHack.currentDate": "current_date",
 	"GreyHack.currentPath": "current_path",

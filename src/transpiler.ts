@@ -32,6 +32,8 @@ export type TranspileContext = {
 	visitedFiles: Set<string>;
 	output: string[];
 	extraOutput: Map<ts.Node, { before: string, after: string; }>;
+	/** Should the element/property access be forced to use get_property */
+	forceSafeAccess?: boolean;
 };
 
 export let program: ts.Program;
@@ -397,10 +399,10 @@ export const utilFunctions = {
 		"	return target",
 		"end function"
 	].join("\n"),
-	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif left == null then return @right\n\treturn @left\nend function",
-	"or_op": "or_op = function(left, right)\n\tif not left then return @right\n\treturn @left\nend function",
-	"is_type": "is_type = function(value, type)\n\treturn typeof(value) == type\nend function",
-	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return when_true\n\treturn when_false\nend function",
+	"nullish_coalescing_op": "nullish_coalescing_op = function(left, right)\n\tif @left == null then return @right\n\treturn @left\nend function",
+	"or_op": "or_op = function(left, right)\n\tif not @left then return @right\n\treturn @left\nend function",
+	"is_type": "is_type = function(value, type)\n\treturn typeof(@value) == type\nend function",
+	"conditional_expr": "conditional_expr = function(cond, when_true, when_false)\n\tif cond then return @when_true\n\treturn @when_false\nend function",
 };
 
 let anonFunctionsCreated = 0;

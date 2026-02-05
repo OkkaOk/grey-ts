@@ -3,35 +3,27 @@ import { NodeHandler } from "../nodeHandler";
 import { checker, type TranspileContext } from "../transpiler";
 import { asRef, callUtilFunction, nodeIsFunctionReference, replaceIdentifier, replacePropertyAccess, valueIsBeingAssignedToNode } from "../utils";
 
-function shouldGetSafely(node: ts.PropertyAccessExpression | ts.ElementAccessExpression) {
+function shouldGetSafely(node: ts.PropertyAccessExpression | ts.ElementAccessExpression, ctx: TranspileContext) {
 	if (ts.isNonNullExpression(node.parent))
 		return false;
+
+	// Can't get the function calls to work with get_property
+	const callParent = ts.findAncestor(node, (n) => n.parent && ts.isCallExpression(n.parent) && n.parent.expression === n);
+	if (callParent) return false;
+
+	if (ctx.forceSafeAccess)
+		return true;
 
 	if (valueIsBeingAssignedToNode(node))
 		return false;
 
-	if (ts.isPropertyAccessExpression(node)) {
-		const rightType = checker.getTypeAtLocation(node.name);
-		if (!rightType.isUnion()) return !!node.questionDotToken;
+	const type = checker.getTypeAtLocation(node);
+	if (!type.isUnion()) return !!node.questionDotToken;
 
-		// Check if the right side has an undefined type.
-		// If not, return false even if there was a questionDot token.
-		const hasUndefined = rightType.types.some(t => t.flags === ts.TypeFlags.Undefined);
-		if (!hasUndefined) return false;
-
-		if (!ts.isCallExpression(node.parent)) return true;
-
-		// The get_property loses the 'self' inside the fetched function.
-		// For example file?.move("somePath") would turn into get_property(file, "move")("somePath")
-		// Here, the get_property returns the move function, but it doesn't know about the file it was in, so the function is useless.
-		// But those functions that take no parameters, have a detached version where we can insert the 'self' parameter, which get_property does (like file?.path())
-		if (node.parent.arguments.length)
-			return false;
-	}
-	else {
-		if (ts.isNumericLiteral(node.argumentExpression) && !node.questionDotToken)
-			return false;
-	}
+	// Check if the node has a nullish type.
+	// If not, return false even if there was a questionDot token.
+	const hasNullish = type.types.some(t => t.flags === ts.TypeFlags.Undefined || ts.TypeFlags.Null);
+	if (!hasNullish) return false;
 
 	return true;
 }
@@ -43,18 +35,18 @@ NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyA
 	right = replaceIdentifier(right, checker.getTypeAtLocation(node.expression), right);
 	// right = unRef(right);
 
-	const nodeSymbol = checker.getSymbolAtLocation(node);
-
 	// We've imported something like this: import * as lib from "mylib"
 	// Next when we use lib.func() we omit the lib. so it becomes func()
 	if (ctx.namespaceImports[ctx.currentFilePath]?.has(left))
 		return right;
 
-	if (shouldGetSafely(node))
+	if (shouldGetSafely(node, ctx))
 		return callUtilFunction("get_property", left, `"${right}"`);
 
+	const nodeSymbol = checker.getSymbolAtLocation(node);
 	let output = `${left}.${right}`;
 	output = replacePropertyAccess(output, nodeSymbol);
+
 
 	if (nodeIsFunctionReference(node))
 		output = asRef(output);
@@ -62,7 +54,7 @@ NodeHandler.register(ts.SyntaxKind.PropertyAccessExpression, (node: ts.PropertyA
 	return output;
 });
 
-NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAccessExpression) => {
+NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAccessExpression, ctx) => {
 	const left = NodeHandler.handle(node.expression);
 	let right: string;
 
@@ -74,7 +66,7 @@ NodeHandler.register(ts.SyntaxKind.ElementAccessExpression, (node: ts.ElementAcc
 		right = NodeHandler.handle(node.argumentExpression);
 	}
 
-	if (shouldGetSafely(node)) {
+	if (shouldGetSafely(node, ctx)) {
 		return callUtilFunction("get_property", left, `${right}`);
 	}
 

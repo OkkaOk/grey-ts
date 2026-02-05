@@ -7,7 +7,7 @@ import { checker, program, utilFunctions, utilitiesToInsert } from "./transpiler
 
 const knownOperators = new Set([
 	"=", "+", "+=", "-", "-=", "++", "--", "**",
-	"&&", "==", "===", "!=", "!==", "??", "??=", "in", 
+	"&&", "==", "===", "!=", "!==", "??", "??=", "||=", "in", 
 	"||", "<", "<=", ">", ">=", "*", "/", "%",
 	"~", "&", "|", "^", "<<", ">>", ">>>", "instanceof"
 ]);

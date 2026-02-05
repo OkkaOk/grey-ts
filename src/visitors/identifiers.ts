@@ -11,23 +11,14 @@ NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
 	if (name === "undefined")
 		return "null"; // No undefined in greyscript
 
-	if (type.isUnion()) {
-		const original = node.text;
-		for (const t of type.types) {
-			name = replaceIdentifier(node.text, t);
-			if (name !== original) break;
-		}
-	}
-	else {
-		name = replaceIdentifier(node.text, type);
-	}
+	name = replaceIdentifier(node.text, type);
 
 	const symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
 	if (symbolFullName in globalObjects) {
 		utilitiesToInsert.set(symbolFullName, globalObjects[symbolFullName as keyof typeof globalObjects]!);
 	}
 
-	if (ctx.namedImports[ctx.currentFilePath]?.[name]) {
+	if (ctx.namedImports[ctx.currentFilePath] && Object.hasOwn(ctx.namedImports[ctx.currentFilePath]!, name)) {
 		name = ctx.namedImports[ctx.currentFilePath]![name]!;
 	}
 

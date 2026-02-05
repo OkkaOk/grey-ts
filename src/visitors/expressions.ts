@@ -198,7 +198,7 @@ function isAssignmentChain(node: ts.BinaryExpression, operator: string): boolean
 	return false;
 }
 
-NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression) => {
+NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression, ctx) => {
 	// console.log(ts.SyntaxKind[node.parent.kind], node.getText())
 	let operatorToken = getOperatorToken(node.operatorToken) || node.operatorToken.getText();
 
@@ -251,7 +251,18 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression)
 		case "??":
 			return callUtilFunction("nullish_coalescing_op", left, right);
 		case "??=":
-			return `${left} = ${callUtilFunction("nullish_coalescing_op", left, right)}`;
+		case "||=": {
+			const util = (operatorToken === "??=") ? "nullish_coalescing_op" : "or_op";
+
+			ctx.forceSafeAccess = true;
+			let leftSafe = NodeHandler.handle(node.left);
+			ctx.forceSafeAccess = false;
+
+			if (nodeIsFunctionReference(node.left))
+				leftSafe = asRef(leftSafe);
+
+			return `${left} = ${callUtilFunction(util, leftSafe, right)}`;
+		}
 		case "in":
 			return `${right}.hasIndex(${left})`;
 		case "&":
