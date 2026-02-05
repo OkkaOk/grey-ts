@@ -221,24 +221,6 @@ export const extensionFunctions = {
 		"	return str_value",
 		"end function",
 	].join("\n"),
-	"Math.min": [
-		"Math.min = function(numbers)",
-		"	curr_min = null",
-		"	for num in numbers",
-		"		if curr_min == null or num < curr_min then curr_min = num",
-		"	end for",
-		"	return curr_min",
-		"end function"
-	].join("\n"),
-	"Math.max": [
-		"Math.max = function(numbers)",
-		"	curr_max = null",
-		"	for num in numbers",
-		"		if curr_max == null or num > curr_max then curr_max = num",
-		"	end for",
-		"	return curr_max",
-		"end function"
-	].join("\n"),
 };
 
 export const globalObjects: Record<string, string> = {
@@ -322,6 +304,29 @@ export const globalObjects: Record<string, string> = {
 		"end function",
 		"Set.values = function",
 		"	return self.data.indexes",
+		"end function",
+	].join("\n"),
+	"Math": [
+		'Math = { "PI": @pi, "abs": @abs, "acos": @acos, "asin": @asin, "atan": @atan, "ceil": @ceil, "floor": @floor, "cos": @cos, "sin": @sin, "tan": @tan, "sqrt": @sqrt, "sign": @sign, "round": @round, "random": @rnd, "log": @log }',
+		"Math.max = function(numbers)",
+		"	curr_max = null",
+		"	for num in numbers",
+		"		if curr_max == null or num > curr_max then curr_max = num",
+		"	end for",
+		"	return curr_max",
+		"end function",
+		"Math.min = function(numbers)",
+		"	curr_min = null",
+		"	for num in numbers",
+		"		if curr_min == null or num < curr_min then curr_min = num",
+		"	end for",
+		"	return curr_min",
+		"end function"
+	].join("\n"),
+	"Console": [
+		'console = { "clear": @clear_screen }',
+		"console.log = function(data)",
+		'	print(data.join(", "))',
 		"end function",
 	].join("\n")
 };

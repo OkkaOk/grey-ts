@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { NodeHandler } from "../nodeHandler";
-import { checker } from "../transpiler";
+import { checker, globalObjects, utilitiesToInsert } from "../transpiler";
 import { asRef, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
 NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
@@ -20,6 +20,11 @@ NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
 	}
 	else {
 		name = replaceIdentifier(node.text, type);
+	}
+
+	const symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
+	if (symbolFullName in globalObjects) {
+		utilitiesToInsert.set(symbolFullName, globalObjects[symbolFullName as keyof typeof globalObjects]!);
 	}
 
 	if (ctx.namedImports[ctx.currentFilePath]?.[name]) {
@@ -67,7 +72,7 @@ NodeHandler.register(ts.SyntaxKind.ThisKeyword, (node: ts.ThisExpression) => {
 			throw `Can't handle this 'this' keyword becuase the class doesn't have a name and it's needed for this case`;
 		return propDeclarationAncestor.parent.name.text;
 	}
-	
+
 	return "self";
 });
 

@@ -18,9 +18,6 @@ export class CallTransformer {
 
 	static handle(symbolFullName: string, functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext): string | null {
 		if (symbolFullName in extensionFunctions) {
-			if (symbolFullName.startsWith("Math"))
-				utilitiesToInsert.set("create_math", "Math = {}");
-			
 			utilitiesToInsert.set(symbolFullName, extensionFunctions[symbolFullName as keyof typeof extensionFunctions]);
 
 			const params = callArgs.length ? `(${callArgs.join(",")})` : "";

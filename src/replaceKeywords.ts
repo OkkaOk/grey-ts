@@ -187,23 +187,6 @@ export const apiNameMap: Record<string, string> = {
 } as const;
 
 export const propertyAccessReplacements: Record<string, string> = {
-	"Math.PI": "pi",
-	"Math.abs": "abs",
-	"Math.acos": "acos",
-	"Math.asin": "asin",
-	"Math.atan": "atan",
-	"Math.ceil": "ceil",
-	"Math.floor": "floor",
-	"Math.cos": "cos",
-	"Math.sin": "sin",
-	"Math.tan": "tan",
-	"Math.sqrt": "sqrt",
-	"Math.sign": "sign",
-	"Math.round": "round",
-	"Math.random": "rnd",
-	"Math.log": "log",
-	"console.log": "print",
-	"console.clear": "clear_screen",
 	"String.prototype": "string",
 	"Number.prototype": "number",
 	"Boolean.prototype": "number", // No boolean in GreyScript
