@@ -109,22 +109,16 @@ export function getSourceFiles(absPath: string): ts.SourceFile[] {
 }
 
 export function replaceIdentifier(original: string, type: ts.Type, propertyName?: string): string {
-	let symbol: ts.Symbol | undefined;
 	if (type.isUnion()) {
-		if (propertyName) {
-			for (const t of type.types) {
-				symbol = t.getProperty(propertyName);
-				if (symbol) break; 
-			}
+		let result = "";
+		for (const t of type.types) {
+			result = replaceIdentifier(original, t, propertyName);
+			if (result !== original) return result;
 		}
-		else {
-			symbol = type.types.find(t => t.flags !== ts.TypeFlags.Undefined && t.symbol)?.symbol;
-		}
-	}
-	else {
-		symbol = propertyName ? type.getProperty(propertyName) : type.symbol;
+		return result
 	}
 
+	const symbol = propertyName ? type.getProperty(propertyName) : type.symbol;
 	if (!symbol) return original;
 
 	const symbolFullName = checker.getFullyQualifiedName(symbol);

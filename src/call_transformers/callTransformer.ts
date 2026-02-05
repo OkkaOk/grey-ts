@@ -1,7 +1,7 @@
 import path from "node:path";
 import ts from "typescript";
 import { NodeHandler } from "../nodeHandler";
-import { extensionFunctions, type TranspileContext, utilitiesToInsert } from "../transpiler";
+import { checker, extensionFunctions, type TranspileContext, utilitiesToInsert } from "../transpiler";
 import { callUtilFunction, getSourceFiles } from "../utils";
 
 type CallHandlerType = (functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext) => string;
@@ -16,7 +16,28 @@ export class CallTransformer {
 		this.handlers.set(symbolFullName, handler);
 	}
 
-	static handle(symbolFullName: string, functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext): string | null {
+	static handle(type: ts.Type, functionName: string, callArgs: string[], node: ts.CallExpression, ctx: TranspileContext): string | null {
+		let symbolFullName = "";
+		if (type.isUnion()) {
+			let result: string | null = null
+			for (const t of type.types) {
+				// This needs to be called so put it into a variable temorarily
+				const res = CallTransformer.handle(t, functionName, callArgs, node, ctx);
+				result ??= res;
+			}
+			return result;
+		}
+		else if (type.symbol) {
+			symbolFullName = checker.getFullyQualifiedName(type.symbol);
+		}
+
+		// Without this some functions would have "__type" as symbolFullName
+		// And with only this it would omit the "GreyHack." from symbolFullName
+		if (!symbolFullName || symbolFullName.startsWith("__")) {
+			const symbol = checker.getSymbolAtLocation(node.expression);
+			symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
+		}
+
 		if (symbolFullName in extensionFunctions) {
 			utilitiesToInsert.set(symbolFullName, extensionFunctions[symbolFullName as keyof typeof extensionFunctions]);
 
@@ -30,11 +51,6 @@ export class CallTransformer {
 		return handler(functionName, callArgs, node, ctx);
 	}
 }
-
-CallTransformer.register("Number.toString", (name) => {
-	const number = name.slice(0, name.lastIndexOf("."));
-	return `str(${number})`;
-});
 
 CallTransformer.register("Function.toString", (name) => {
 	const func = name.slice(0, name.lastIndexOf("."));

@@ -16,9 +16,7 @@ import "./visitors/objects";
 import "./visitors/statements";
 import "./visitors/variables";
 
-import "./call_transformers/array";
 import "./call_transformers/object";
-import "./call_transformers/string";
 
 type Mode = "ts" | "js";
 
@@ -167,6 +165,8 @@ export const extensionFunctions = {
 		"	return self",
 		"end function",
 	].join("\n"),
+	"Array.toString": "list.toString = function\n\treturn str(self)\nend function",
+	"Array.slice": "list.slice = function(a, b)\n\treturn self[a:b]\nend function",
 	"String.startsWith": [
 		"string.startsWith = function(search, pos = 0)",
 		"	if pos < 0 then pos = 0",
@@ -203,6 +203,8 @@ export const extensionFunctions = {
 		'	return self.replace("\\s+$", "")',
 		"end function",
 	].join("\n"),
+	"String.toString": "string.toString = function\n\treturn str(self)\nend function",
+	"String.slice": "string.slice = function(a, b)\n\treturn self[a:b]\nend function",
 	"Number.toFixed": [
 		"number.toFixed = function(digits = 0)",
 		"	digits = floor(digits)",
@@ -223,6 +225,8 @@ export const extensionFunctions = {
 		"	return str_value",
 		"end function",
 	].join("\n"),
+	"Number.toString": "number.toString = function\n\treturn str(self)\nend function",
+	"Function.toString": "funcRef.toString = function\n\treturn str(@self)\nend function",
 };
 
 export const globalObjects: Record<string, string> = {

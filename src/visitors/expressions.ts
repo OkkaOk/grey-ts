@@ -125,18 +125,9 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 	const args = handleCallArgs(node, ctx);
 
 	const name = NodeHandler.handle(node.expression);
-
 	const type = checker.getTypeAtLocation(node.expression);
-	let symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
 
-	// Without this for example Math.max would have "__type" as symbolFullName
-	// And with only this it would omit the "GreyHack." from symbolFullName
-	if (!symbolFullName || symbolFullName.startsWith("__")) {
-		const symbol = checker.getSymbolAtLocation(node.expression);
-		symbolFullName = symbol ? checker.getFullyQualifiedName(symbol) : "";
-	}
-
-	const transformed = CallTransformer.handle(symbolFullName, name, args, node, ctx);
+	const transformed = CallTransformer.handle(type, name, args, node, ctx);
 	if (transformed !== null) return transformed;
 
 	if (!args.length && !ts.isParenthesizedExpression(node.expression))
