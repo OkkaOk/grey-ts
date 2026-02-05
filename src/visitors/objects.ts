@@ -17,6 +17,12 @@ function shouldGetSafely(node: ts.PropertyAccessExpression | ts.ElementAccessExp
 	if (valueIsBeingAssignedToNode(node))
 		return false;
 
+	if (ts.isElementAccessExpression(node)) {
+		if (ts.isNumericLiteral(node.argumentExpression) && !node.questionDotToken)
+			return false;
+		return true;
+	}
+
 	const type = checker.getTypeAtLocation(node);
 	if (!type.isUnion()) return !!node.questionDotToken;
 

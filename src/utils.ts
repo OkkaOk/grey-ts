@@ -110,7 +110,7 @@ export function getSourceFiles(absPath: string): ts.SourceFile[] {
 
 export function replaceIdentifier(original: string, type: ts.Type, propertyName?: string): string {
 	if (type.isUnion()) {
-		let result = "";
+		let result = original;
 		for (const t of type.types) {
 			result = replaceIdentifier(original, t, propertyName);
 			if (result !== original) return result;
