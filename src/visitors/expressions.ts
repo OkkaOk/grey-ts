@@ -2,7 +2,7 @@
 import ts from "typescript";
 import { CallTransformer } from "../call_transformers/callTransformer";
 import { NodeHandler } from "../nodeHandler";
-import { checker, type TranspileContext } from "../transpiler";
+import { checker, globalObjects, type TranspileContext, utilitiesToInsert } from "../transpiler";
 import { asRef, assignmentOperators, callUtilFunction, getOperatorToken, nodeIsFunctionReference, replaceIdentifier, transformString } from "../utils";
 
 /** Check if the last parameter is a rest parameter */
@@ -147,6 +147,13 @@ NodeHandler.register(ts.SyntaxKind.CallExpression, (node: ts.CallExpression, ctx
 
 NodeHandler.register(ts.SyntaxKind.NewExpression, (node: ts.NewExpression, ctx) => {
 	const args = handleCallArgs(node, ctx);
+
+	const type = checker.getTypeAtLocation(node.expression);
+	const symbolFullName = type.symbol ? checker.getFullyQualifiedName(type.symbol) : "";
+
+	if (symbolFullName in globalObjects) {
+		utilitiesToInsert.set(symbolFullName, globalObjects[symbolFullName as keyof typeof globalObjects]!);
+	}
 
 	let output = `(new ${NodeHandler.handle(node.expression)}).constructor`;
 	if (args.length)
