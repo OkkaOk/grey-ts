@@ -35,11 +35,11 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.14",
-		"@grey-ts/types": "latest",
+		"@grey-ts/types": "^3.0.0",
 		"@types/bun": "latest"
 	},
 	"peerDependencies": {
-		"typescript": "^5",
+		"typescript": "^5.9.3",
 		"@grey-ts/types": "^2.2.0"
 	}
 }

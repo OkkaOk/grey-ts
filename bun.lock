@@ -34,7 +34,7 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.3.14", "", { "os": "win32", "cpu": "x64" }, "sha512-oizCjdyQ3WJEswpb3Chdngeat56rIdSYK12JI3iI11Mt5T5EXcZ7WLuowzEaFPNJ3zmOQFliMN8QY1Pi+qsfdQ=="],
 
-    "@grey-ts/types": ["@grey-ts/types@2.2.1", "", {}, "sha512-E7zcZdmpHkB/X8DFpp1l+Tgs30YBRCC2cGI0zy3Ipwk0ShizD6gXjpLw0e8tObkksBr8wP5wjmHFtQfTLTbGUw=="],
+    "@grey-ts/types": ["@grey-ts/types@3.0.0", "", {}, "sha512-HV7AQ/cb0nhIirtWwaoypV1s5NkPkJdEKk77uF2ve1RTOUTvzdXVT7VIenNFvIp8ws3/6viO/MyD2JWNK6O+SA=="],
 
     "@types/bun": ["@types/bun@1.3.8", "", { "dependencies": { "bun-types": "1.3.8" } }, "sha512-3LvWJ2q5GerAXYxO2mffLTqOzEu5qnhEAlh48Vnu8WQfnmSwbgagjGZV6BoHKJztENYEDn6QmVd949W4uESRJA=="],
 
