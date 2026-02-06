@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { NodeHandler } from "../nodeHandler";
+import { handleFunctionBodyAndParams } from "./functions";
 
 
 NodeHandler.register(ts.SyntaxKind.ClassDeclaration, (node: ts.ClassDeclaration) => {
@@ -42,57 +43,47 @@ NodeHandler.register(ts.SyntaxKind.ClassDeclaration, (node: ts.ClassDeclaration)
 	return output;
 });
 
-NodeHandler.register(ts.SyntaxKind.Constructor, (node: ts.ConstructorDeclaration) => {
+NodeHandler.register(ts.SyntaxKind.Constructor, (node: ts.ConstructorDeclaration, ctx) => {
 	if (!node.body)
 		return "";
 
-	const declaredProperties: string[] = [];
+	const func = handleFunctionBodyAndParams(node, ctx);
 
-	const params = node.parameters.map(param => {
-		const res = NodeHandler.handle(param);
+	if (ctx.parameterProperties.length) {
+		const propertiesStr = ctx.parameterProperties.join("\n");
+		ctx.parameterProperties.length = 0;
 
-		if (param.modifiers) {
-			const paramName = NodeHandler.handle(param.name);
-			const declaration = `\tself.${paramName} = ${paramName}`;
-			declaredProperties.push(declaration);
-		}
-
-		return res;
-	}).join(", ");
-
-	let body = NodeHandler.handle(node.body);
-	if (declaredProperties.length) {
-		const propertiesStr = declaredProperties.join("\n");
-
-		const lines = body.split("\n");
+		const lines = func.body.split("\n");
 		const superIndex = lines.findIndex(line => line.includes("super.constructor"));
 
 		if (superIndex !== -1) {
-			body = `${lines.slice(0, superIndex + 1).join("\n")}\n${propertiesStr}\n${lines.slice(superIndex + 1).join("\n")}`;
+			func.body = `${lines.slice(0, superIndex + 1).join("\n")}\n${propertiesStr}\n${lines.slice(superIndex + 1).join("\n")}`;
 		}
 		else {
-			body = `${propertiesStr}\n${body}`;
+			func.body = `${propertiesStr}\n${func.body}`;
 		}
 	}
 
-	return `constructor = function(${params})\n${body}\n\treturn self\nend function`;
+	return [
+		`constructor = function${func.params.length ? `(${func.params.join(", ")})` : ""}`,
+		...(func.body ? [func.body] : []),
+		"	return self",
+		`end function`
+	].join("\n");
 });
 
-NodeHandler.register(ts.SyntaxKind.GetAccessor, (node: ts.GetAccessorDeclaration) => {
+NodeHandler.register(ts.SyntaxKind.GetAccessor, (node: ts.GetAccessorDeclaration, ctx) => {
 	if (!node.body)
 		return "";
 
-	const body = NodeHandler.handle(node.body);
-
-	return `${NodeHandler.handle(node.name)} = function\n${body}\nend function`;
+	const func = handleFunctionBodyAndParams(node, ctx);
+	return `${NodeHandler.handle(node.name)} = ${func.functionOutput}`;
 });
 
-NodeHandler.register(ts.SyntaxKind.SetAccessor, (node: ts.SetAccessorDeclaration) => {
+NodeHandler.register(ts.SyntaxKind.SetAccessor, (node: ts.SetAccessorDeclaration, ctx) => {
 	if (!node.body)
 		return "";
 
-	const body = NodeHandler.handle(node.body);
-	const params = node.parameters.map(param => NodeHandler.handle(param)); // Should only be 1 parameter
-
-	return `set_${NodeHandler.handle(node.name)} = function(${params.join(", ")})\n${body}\nend function`;
+	const func = handleFunctionBodyAndParams(node, ctx);
+	return `set_${NodeHandler.handle(node.name)} = ${func.functionOutput}`;
 });

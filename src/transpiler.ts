@@ -13,6 +13,7 @@ import "./visitors/functions";
 import "./visitors/identifiers";
 import "./visitors/imports";
 import "./visitors/objects";
+import "./visitors/patterns";
 import "./visitors/statements";
 import "./visitors/variables";
 
@@ -32,6 +33,14 @@ export type TranspileContext = {
 	extraOutput: Map<ts.Node, { before: string, after: string; }>;
 	/** Should the element/property access be forced to use get_property */
 	forceSafeAccess?: boolean;
+	/** 
+	 * The record of identifiers to replace because they came from binding patterns 
+	 * 
+	 * The key is the identifier to replace, value is the replaceValue
+	 */
+	bindingElements: Record<string, string>;
+	/** Parameters declared in a class constructor (e.g. `constructor(public myValue: number)`) */
+	parameterProperties: string[];
 };
 
 export let program: ts.Program;
@@ -416,7 +425,11 @@ export function createAnonFunction(body: string, params: string[], insertToUtils
 	const nextName = `func_${anonFunctionsCreated}`; // A unique name
 	const paramString = Object.assign(defaultParams, params).join(",");
 
-	const result = `${nextName} = function(${paramString})\n${body}\nend function`;
+	const result = [
+		`${nextName} = function(${paramString})`,
+		...(body ? [body] : []),
+		`end function`
+	].join("\n");
 
 	anonFunctionsCreated++;
 	if (insertToUtils) utilitiesToInsert.set(nextName, result);
@@ -437,6 +450,8 @@ function createContext(currentFileName = "file.ts"): TranspileContext {
 		visitedFiles: new Set(),
 		output: [],
 		extraOutput: new Map(),
+		bindingElements: {},
+		parameterProperties: [],
 	};
 }
 

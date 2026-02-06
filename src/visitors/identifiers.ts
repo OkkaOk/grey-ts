@@ -22,6 +22,10 @@ NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
 		name = ctx.namedImports[ctx.currentFilePath]![name]!;
 	}
 
+	if (Object.hasOwn(ctx.bindingElements, name)) {
+		return ctx.bindingElements[name]!;
+	}
+
 	if (ts.isCallOrNewExpression(node.parent) && node !== node.parent.expression) {
 		// Is inside a call expression and is a function reference
 		if (nodeIsFunctionReference(node, type))
@@ -31,8 +35,15 @@ NodeHandler.register(ts.SyntaxKind.Identifier, (node: ts.Identifier, ctx) => {
 	return name;
 });
 
-NodeHandler.register(ts.SyntaxKind.Parameter, (node: ts.ParameterDeclaration) => {
+NodeHandler.register(ts.SyntaxKind.Parameter, (node: ts.ParameterDeclaration, ctx) => {
 	const name = NodeHandler.handle(node.name);
+
+	if (node.modifiers && ts.isConstructorDeclaration(node.parent)) {
+		const paramName = name;
+		const declaration = `\tself.${paramName} = ${paramName}`;
+		ctx.parameterProperties.push(declaration);
+	}
+
 	if (!node.initializer) return name;
 
 	const initializer = NodeHandler.handle(node.initializer);
