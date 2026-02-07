@@ -30,9 +30,11 @@ export type TranspileContext = {
 	mode?: Mode;
 	visitedFiles: Set<string>;
 	output: string[];
-	extraOutput: Map<ts.Node, { before: string, after: string; }>;
+	extraOutput: Map<ts.Node, { before: string[], after: string[]; }>;
 	/** Should the element/property access be forced to use get_property */
 	forceSafeAccess?: boolean;
+	/** Should the identifier be forced to use outer. prefix */
+	forceOuterPrefix?: boolean;
 	/** 
 	 * The record of identifiers to replace because they came from binding patterns 
 	 * 

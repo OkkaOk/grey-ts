@@ -146,7 +146,7 @@ NodeHandler.register(ts.SyntaxKind.NewExpression, (node: ts.NewExpression, ctx) 
 	return output;
 });
 
-function shouldHaveOuterPrefix(node: ts.BinaryExpression, operator: string): boolean {
+function shouldHaveOuterPrefix(node: ts.BinaryExpression, operator: string, ctx: TranspileContext): boolean {
 	// Only assigning has to be considered, reading is fine even without
 	if (!assignmentOperators.has(operator))
 		return false;
@@ -154,6 +154,9 @@ function shouldHaveOuterPrefix(node: ts.BinaryExpression, operator: string): boo
 	// Works for property access as well without the outer prefix. Identifiers are the only problem
 	if (!ts.isIdentifier(node.left))
 		return false;
+
+	if (ctx.forceOuterPrefix)
+		return true;
 
 	// Check if we're inside a nested function
 
@@ -226,7 +229,7 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression,
 
 	let left = NodeHandler.handle(node.left);
 
-	if (shouldHaveOuterPrefix(node, operatorToken))
+	if (shouldHaveOuterPrefix(node, operatorToken, ctx))
 		left = `outer.${left}`;
 
 	if (nodeIsFunctionReference(node.left))
@@ -268,8 +271,17 @@ NodeHandler.register(ts.SyntaxKind.BinaryExpression, (node: ts.BinaryExpression,
 			return `bitwise(">>", ${left}, ${right})`;
 		case ">>>":
 			return `bitwise(">>>", ${left}, ${right})`;
+		case "<<=":
+		case ">>=":
+		case ">>>=":
+			return `${left} = bitwise("${operatorToken.slice(0, -1)}", ${left}, ${right})`;
+		case "**=":
+			return `${left} = ${left} ^ ${right}`;
 		case "+=":
 		case "-=":
+		case "*=":
+		case "/=":
+		case "%=":
 			return `${left} = ${left} ${operatorToken[0]} ${right}`;
 	}
 
@@ -391,6 +403,10 @@ NodeHandler.register(ts.SyntaxKind.NoSubstitutionTemplateLiteral, (node: ts.NoSu
 NodeHandler.register(ts.SyntaxKind.ConditionalExpression, (node: ts.ConditionalExpression) => {
 	if (ts.isCallExpression(node.whenTrue) || ts.isCallExpression(node.whenFalse)) {
 		throw "Call expressions are not supported inside conditional expressions yet"; // TODO: think of a solution for this
+	}
+
+	if (ts.isBinaryExpression(node.whenTrue) || ts.isBinaryExpression(node.whenFalse)) {
+		throw "Binary expressions are not supported inside conditional expressions yet";
 	}
 
 	const condition = NodeHandler.handle(node.condition);

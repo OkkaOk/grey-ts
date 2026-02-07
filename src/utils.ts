@@ -7,8 +7,9 @@ import { checker, program, utilFunctions, utilitiesToInsert } from "./transpiler
 
 const knownOperators = new Set([
 	"=", "+", "+=", "-", "-=", "++", "--", "**",
-	"&&", "==", "===", "!=", "!==", "??", "??=", "||=", "in", 
+	"&&", "==", "===", "!=", "!==", "??", "??=", "||=", "in",
 	"||", "<", "<=", ">", ">=", "*", "/", "%",
+	"*=", "/=", "%=", "**=", "<<=", ">>=", ">>>=",
 	"~", "&", "|", "^", "<<", ">>", ">>>", "instanceof"
 ]);
 
@@ -115,7 +116,7 @@ export function replaceIdentifier(original: string, type: ts.Type, propertyName?
 			result = replaceIdentifier(original, t, propertyName);
 			if (result !== original) return result;
 		}
-		return result
+		return result;
 	}
 
 	const symbol = propertyName ? type.getProperty(propertyName) : type.symbol;

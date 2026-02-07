@@ -31,9 +31,9 @@ export class NodeHandler {
 			if (!extra) return result;
 
 			return [
-				...(extra.before ? [extra.before] : []),
+				...extra.before,
 				result,
-				...(extra.after ? [extra.after] : []),
+				...extra.after,
 			].join("\n");
 		} catch (error) {
 			console.error(error);
@@ -46,12 +46,12 @@ export class NodeHandler {
 	static addExtraOutput(node: ts.Node, before: string | null, after: string | null) {
 		let extra = this.transpileContext.extraOutput.get(node);
 		if (!extra) {
-			extra = { before: "", after: "" };
+			extra = { before: [], after: [] };
 			this.transpileContext.extraOutput.set(node, extra);
 		}
 
-		if (before) extra.before += before;
-		if (after) extra.after += after;
+		if (before) extra.before.push(before);
+		if (after) extra.after.push(after);
 	}
 
 	private static printLineAndCol(node: ts.Node) {
