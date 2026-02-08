@@ -42,11 +42,11 @@ describe("Arrays", () => {
 		).toInclude(`myArr = [1,2,3].concat([[4,5,6],7])`);
 	});
 
-	// test("Array.push", () => {
-	// 	expect(
-	// 		transpileString("const myArr = [1,2,3]\nmyArr.push(4,5,6)")
-	// 	).toInclude(`myArr.push_many([4,5,6])`);
-	// });
+	test("Array.push", () => {
+		expect(
+			transpileString("[1,2,3].push(4,5,6)")
+		).toInclude(`[1,2,3].push_many([4,5,6])`);
+	});
 });
 
 describe("Functions", () => {

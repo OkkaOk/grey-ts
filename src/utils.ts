@@ -174,7 +174,8 @@ export function printNodeAST(node: ts.Node, output: string[] = [], depth = 0, is
 }
 
 export const assignmentOperators = new Set<string>([
-	"=", "??=", "||=", "-=", "+="
+	"=", "??=", "||=", "-=", "+=", "*=",
+	"/=", "%=", "**=", "<<=", ">>=", ">>>=",
 ]);
 
 export function valueIsBeingAssignedToNode(node: ts.Node): boolean {
