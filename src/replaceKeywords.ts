@@ -179,10 +179,6 @@ export const apiNameMap: Record<string, string> = {
 	"Array.length": "len",
 	"Array.shift": "pull",
 	"Array.push": "push_many",
-	// Map
-	"Map.size": "data.len",
-	// Set
-	"Set.size": "data.len",
 } as const;
 
 export const propertyAccessReplacements: Record<string, string> = {

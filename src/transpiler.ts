@@ -288,6 +288,9 @@ export const globalObjects: Record<string, string> = {
 		"Map.values = function",
 		"	return self.data.values",
 		"end function",
+		"Map.size = function",
+		"	return self.data.len",
+		"end function",
 	].join("\n"),
 	"SetConstructor": [
 		"Set = {}",
@@ -321,6 +324,9 @@ export const globalObjects: Record<string, string> = {
 		"end function",
 		"Set.values = function",
 		"	return self.data.indexes",
+		"end function",
+		"Set.size = function",
+		"	return self.data.len",
 		"end function",
 	].join("\n"),
 	"Math": [
