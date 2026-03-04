@@ -91,5 +91,5 @@ NodeHandler.register(ts.SyntaxKind.RegularExpressionLiteral, (node: ts.RegularEx
 	if (flags)
 		throw "Regex flags are not supported yet";
 
-	return `"${node.text.slice(start, end)}"`;
+	return `"${node.text.slice(start, end).replaceAll('"', '""')}"`;
 });
