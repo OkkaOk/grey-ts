@@ -61,7 +61,7 @@ if (command === "transpile") {
 		console.log(transpiledStatements.join("\n"));
 		process.exit(0);
 	}
-	
+
 	if (!fs.existsSync(outDirPath))
 		fs.mkdirSync(outDirPath);
 
@@ -72,7 +72,7 @@ if (command === "transpile") {
 		const statement = transpiledStatements.shift()!;
 		if (content.length + statement.length > 155_000 && content.length) {
 			fileContents.push(content);
-			content = "";
+			content = `${statement}\n`;
 			continue;
 		}
 
@@ -84,7 +84,7 @@ if (command === "transpile") {
 
 	for (let i = 0; i < fileContents.length; i++) {
 		if (i + 1 < fileContents.length) {
-			const nextFileName = `${basename}-${i+1}.src`
+			const nextFileName = `${basename}-${i + 1}.src`;
 			fileContents[i] += `import_code("${nextFileName}")`;
 		}
 
