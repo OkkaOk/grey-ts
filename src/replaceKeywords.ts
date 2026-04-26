@@ -97,6 +97,7 @@ export const apiNameMap: Record<string, string> = {
 	"GreyHack.getType": "typeof",
 	"GreyHack.userBankNumber": "user_bank_number",
 	"GreyHack.userInput": "user_input",
+	"GreyHack.pollInput": "poll_input",
 	"GreyHack.userMailAddress": "user_mail_address",
 	// MetaLib
 	"GreyHack.MetaLib.debugTools": "debug_tools",
@@ -188,4 +189,4 @@ export const propertyAccessReplacements: Record<string, string> = {
 	"Object.prototype": "map",
 	"Array.prototype": "list",
 	"Function.prototype": "funcRef",
-}
+};
