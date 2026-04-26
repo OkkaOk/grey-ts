@@ -1,6 +1,6 @@
 {
 	"name": "@grey-ts/transpiler",
-	"version": "2.1.1",
+	"version": "2.2.0",
 	"description": "Transpiles TypeScript into GreyScript",
 	"author": "Okka",
 	"module": "src/index.ts",
